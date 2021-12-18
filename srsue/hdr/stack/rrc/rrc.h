@@ -299,6 +299,7 @@ private:
   class cell_reselection_proc;
   class connection_reest_proc;
   class ho_proc;
+  
   srsran::proc_t<cell_search_proc, rrc_interface_phy_lte::cell_search_ret_t> cell_searcher;
   srsran::proc_t<si_acquire_proc>                                            si_acquirer;
   srsran::proc_t<serving_cell_config_proc>                                   serv_cell_cfg;
@@ -377,6 +378,7 @@ private:
   void handle_sib2();
   void handle_sib3();
   void handle_sib13();
+  void my(); //merkebu
 
   void     handle_con_setup(const asn1::rrc::rrc_conn_setup_s& setup);
   void     handle_con_reest(const asn1::rrc::rrc_conn_reest_s& setup);

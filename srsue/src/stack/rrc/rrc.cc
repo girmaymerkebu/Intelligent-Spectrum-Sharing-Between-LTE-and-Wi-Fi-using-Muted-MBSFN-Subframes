@@ -40,6 +40,8 @@
 #include <math.h>
 #include <numeric>
 #include <string.h>
+#include <string>
+#include <iostream>
 
 bool simulate_rlf = false;
 
@@ -274,7 +276,16 @@ void rrc::run_tti()
     cell_clean_cnt = 0;
   }
 }
+//merkebu
 
+void rrc::my(){
+
+const std::vector<uint32_t> required_sibsn{1};
+meas_cells.serving_cell().has_valid_sib2=false; //clear stored sib2 to use new one 
+serving_cell_config_proc r(this);
+r.trigger_new_sib_acquire(required_sibsn);
+          
+}
 /*******************************************************************************
  *
  *
@@ -1273,7 +1284,7 @@ void rrc::write_pdu_bcch_dlsch(unique_byte_buffer_t pdu)
 void rrc::parse_pdu_bcch_dlsch(unique_byte_buffer_t pdu)
 {
   // Stop BCCH search after successful reception of 1 BCCH block
-  mac->bcch_stop_rx();
+  mac->bcch_stop_rx(); //Merkebu
 
   bcch_dl_sch_msg_s dlsch_msg;
   asn1::cbit_ref    dlsch_bref(pdu->msg, pdu->N_bytes);
@@ -1351,11 +1362,12 @@ void rrc::handle_sib1()
   }
 }
 
-void rrc::handle_sib2()
+void rrc::handle_sib2() //merkebu sib2 decoding
 {
   logger.info("SIB2 received");
 
   const sib_type2_s* sib2 = meas_cells.serving_cell().sib2ptr();
+  //cout<<"in the begining"<<has_sib2();
 
   // Apply RACH and timeAlginmentTimer configuration
   set_mac_cfg_t_rach_cfg_common(&current_mac_cfg, sib2->rr_cfg_common.rach_cfg_common);
@@ -1369,6 +1381,7 @@ void rrc::handle_sib2()
       list[i] = srsran::make_mbsfn_sf_cfg(sib2->mbsfn_sf_cfg_list[i]);
     }
     phy->set_config_mbsfn_sib2(&list[0], sib2->mbsfn_sf_cfg_list.size());
+    //std::cout<<"here \t"<<(uint32_t)sib2->mbsfn_sf_cfg_list[0].sf_alloc.one_frame().to_number();
   }
 
   // Apply PHY RR Config Common
@@ -1419,6 +1432,10 @@ void rrc::handle_sib2()
               t310.duration(),
               t311.duration());
 }
+
+
+
+
 
 void rrc::handle_sib3()
 {

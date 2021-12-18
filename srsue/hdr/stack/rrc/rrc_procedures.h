@@ -77,14 +77,16 @@ public:
 
   explicit si_acquire_proc(rrc* parent_);
   srsran::proc_outcome_t init(uint32_t sib_index_);
+  srsran::proc_outcome_t myinit(uint32_t sib_index_);
   srsran::proc_outcome_t step() { return srsran::proc_outcome_t::yield; }
   static const char*     name() { return "SI Acquire"; }
   srsran::proc_outcome_t react(si_acq_timer_expired ev);
   srsran::proc_outcome_t react(sib_received_ev ev);
   void                   then(const srsran::proc_state_t& result);
-
+  void start_si_acquire(); //merkebu
+  
 private:
-  void start_si_acquire();
+  //void start_si_acquire(); //merkebu
 
   // conts
   rrc*                  rrc_ptr;
@@ -103,12 +105,16 @@ public:
   srsran::proc_outcome_t init(const std::vector<uint32_t>& required_sibs_);
   srsran::proc_outcome_t step();
   static const char*     name() { return "Serving Cell Configuration"; }
-
+  srsran::proc_outcome_t launch_sib_acquire(); //merkebu made public
+  srsran::proc_outcome_t new_sib_acquire(); //merkebu added
+  srsran::proc_outcome_t trigger_new_sib_acquire(const std::vector<uint32_t>& required_sibs_);
+  
 private:
   rrc*                  rrc_ptr;
   srslog::basic_logger& logger;
 
-  srsran::proc_outcome_t launch_sib_acquire();
+  //srsran::proc_outcome_t launch_sib_acquire(); //merkebu
+  
 
   // proc args
   std::vector<uint32_t> required_sibs;
@@ -130,7 +136,7 @@ public:
   static const char*     name() { return "Cell Selection"; }
   srsran::proc_outcome_t react(const bool& event);
   void                   then(const srsran::proc_result_t<cs_result_t>& proc_result) const;
-
+  srsran::proc_outcome_t start_sib_acquisition(); //merkebu
 private:
   srsran::proc_outcome_t start_next_cell_selection();
   srsran::proc_outcome_t step_cell_search();
@@ -139,7 +145,7 @@ private:
   bool                   is_sib_acq_required() const;
   srsran::proc_outcome_t set_proc_complete();
   srsran::proc_outcome_t start_phy_cell_selection(const meas_cell_eutra& cell);
-  srsran::proc_outcome_t start_sib_acquisition();
+  //srsran::proc_outcome_t start_sib_acquisition(); //merkebu
 
   // consts
   rrc*                             rrc_ptr;

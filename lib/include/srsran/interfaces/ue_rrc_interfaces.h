@@ -36,7 +36,10 @@ public:
   virtual void ra_completed()      = 0;
   virtual void ra_problem()        = 0;
   virtual void release_pucch_srs() = 0;
+  virtual void my() =  0; //merkebu
+	
 };
+
 
 class rrc_eutra_interface_rrc_nr
 {

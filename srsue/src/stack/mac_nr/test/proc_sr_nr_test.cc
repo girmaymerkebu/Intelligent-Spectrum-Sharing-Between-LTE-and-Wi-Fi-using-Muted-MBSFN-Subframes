@@ -65,6 +65,7 @@ class dummy_rrc : public rrc_interface_mac
   void ra_completed() {}
   void ra_problem() {}
   void release_pucch_srs() {}
+  void my() {} //merkebu
 };
 
 class dummy_mac : public mac_interface_sr_nr

@@ -328,6 +328,8 @@ public:
   void     ra_problem() { rach_problem++; }
   bool     ho_finish_successful = false;
   uint32_t rach_problem         = 0;
+  void my(){}; //merkebu
+  
 };
 
 class stack_dummy : public stack_test_dummy
