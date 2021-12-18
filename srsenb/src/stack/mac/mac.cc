@@ -718,12 +718,20 @@ int mac::get_dl_sched(uint32_t tti_tx_dl, dl_sched_list_t& dl_sched_res_list)
     for (uint32_t i = 0; i < sched_result.bc.size(); i++) {
       // Copy dci info
       dl_sched_res->pdsch[n].dci = sched_result.bc[i].dci;
+      //merkebu
+    
 
       // Set softbuffer
       if (sched_result.bc[i].type == sched_interface::dl_sched_bc_t::BCCH) {
+          if (tti_tx_dl%15==0){
+            rrc_h->configure_mbsfn_sibs();
+            rrc_h->generate_sibs(); 
+            //std::cout<<tti_tx_dl<<"\t here \t";
+          }
         dl_sched_res->pdsch[n].softbuffer_tx[0] =
             &common_buffers[enb_cc_idx].bcch_softbuffer_tx[sched_result.bc[i].index];
         dl_sched_res->pdsch[n].data[0] = rrc_h->read_pdu_bcch_dlsch(enb_cc_idx, sched_result.bc[i].index);
+        
 #ifdef WRITE_SIB_PCAP
         if (pcap) {
           pcap->write_dl_sirnti(dl_sched_res->pdsch[n].data[0], sched_result.bc[i].tbs, true, tti_tx_dl, enb_cc_idx);
@@ -737,7 +745,7 @@ int mac::get_dl_sched(uint32_t tti_tx_dl, dl_sched_list_t& dl_sched_res_list)
         dl_sched_res->pdsch[n].softbuffer_tx[0] = &common_buffers[enb_cc_idx].pcch_softbuffer_tx;
         dl_sched_res->pdsch[n].data[0]          = common_buffers[enb_cc_idx].pcch_payload_buffer;
         rlc_h->read_pdu_pcch(common_buffers[enb_cc_idx].pcch_payload_buffer, pcch_payload_buffer_len);
-
+        
         if (pcap) {
           pcap->write_dl_pch(dl_sched_res->pdsch[n].data[0], sched_result.bc[i].tbs, true, tti_tx_dl, enb_cc_idx);
         }

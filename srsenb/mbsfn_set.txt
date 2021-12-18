@@ -1,0 +1,1 @@
+subframe_allocation 63 Allocation_period 1

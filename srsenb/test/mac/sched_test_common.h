@@ -48,6 +48,10 @@ public:
   void     set_radiolink_dl_state(uint16_t rnti, bool crc_res) {}
   bool     is_paging_opportunity(uint32_t tti, uint32_t* payload_len) { return false; }
   uint8_t* read_pdu_bcch_dlsch(const uint8_t enb_cc_idx, const uint32_t sib_index) { return nullptr; }
+   // void     config_mac() {}
+  void    configure_mbsfn_sibs() {}
+ //int      pack_mcch() { return SRSRAN_SUCCESS; }
+ uint32_t generate_sibs() { return SRSRAN_SUCCESS; }
 };
 
 /**************************
