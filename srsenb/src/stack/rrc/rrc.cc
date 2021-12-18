@@ -30,6 +30,11 @@
 #include "srsran/interfaces/enb_pdcp_interfaces.h"
 #include "srsran/interfaces/enb_rlc_interfaces.h"
 #include "srsran/interfaces/sched_interface.h"
+#include <bitset>
+#include <fstream>
+#include <iostream>
+#include <string>
+using namespace std;
 
 using srsran::byte_buffer_t;
 
@@ -69,7 +74,7 @@ int32_t rrc::init(const rrc_cfg_t&       cfg_,
 
   // Loads the PRACH root sequence
   cfg.sibs[1].sib2().rr_cfg_common.prach_cfg.root_seq_idx = cfg.cell_list[0].root_seq_idx;
-
+  cell_common_list.reset(new enb_cell_common_list{cfg}); // merkebu
   if (generate_sibs() != SRSRAN_SUCCESS) {
     logger.error("Couldn't generate SIBs.");
     return false;
@@ -130,6 +135,8 @@ void rrc::get_metrics(rrc_metrics_t& m)
 uint8_t* rrc::read_pdu_bcch_dlsch(const uint8_t cc_idx, const uint32_t sib_index)
 {
   if (sib_index < ASN1_RRC_MAX_SIB && cc_idx < cell_common_list->nof_cells()) {
+    // Merkebu check sib buffer size
+    // cout<<cell_common_list->get_cc_idx(cc_idx)->sib_buffer;
     return cell_common_list->get_cc_idx(cc_idx)->sib_buffer.at(sib_index)->msg;
   }
   return nullptr;
@@ -792,13 +799,52 @@ uint32_t rrc::generate_sibs()
   sched_info_list_l& sched_info   = cfg.sib1.sched_info_list;
 
   // Store configs,SIBs in common cell ctxt list
-  cell_common_list.reset(new enb_cell_common_list{cfg});
+  // cell_common_list.reset(new enb_cell_common_list{cfg}); //Merkebu this creates reconfiguration error
 
   // generate and pack into SIB buffers
   for (uint32_t cc_idx = 0; cc_idx < cfg.cell_list.size(); cc_idx++) {
+    // merkebu
+
+      string mbsfn_periodname;
+    int      nmbsfn_period;
+    string      nmbsfn_sfallocname;
+    int      nmbsfn_sfalloc;
+    ifstream txmuten("/home/merkebu/srsRAN/srsenb/mbsfn_set.txt");
+   
+    txmuten >>nmbsfn_sfallocname;
+    txmuten>>nmbsfn_sfalloc;
+    txmuten>> mbsfn_periodname;
+    txmuten>>nmbsfn_period;
+    if (nmbsfn_period == 1) {
+      cell_common_list->get_cc_idx(cc_idx)->sib2.mbsfn_sf_cfg_list[0].radioframe_alloc_period.value =mbsfn_sf_cfg_s::radioframe_alloc_period_opts::n1;
+    }
+     else if (nmbsfn_period==2)
+  {
+    cell_common_list->get_cc_idx(cc_idx)->sib2.mbsfn_sf_cfg_list[0].radioframe_alloc_period.value =mbsfn_sf_cfg_s::radioframe_alloc_period_opts::n2;
+  }
+    else if (nmbsfn_period==4)
+  {
+    cell_common_list->get_cc_idx(cc_idx)->sib2.mbsfn_sf_cfg_list[0].radioframe_alloc_period .value =mbsfn_sf_cfg_s::radioframe_alloc_period_opts::n4;
+  }
+    else if (nmbsfn_period==8)
+  {
+    cell_common_list->get_cc_idx(cc_idx)->sib2.mbsfn_sf_cfg_list[0].radioframe_alloc_period .value =mbsfn_sf_cfg_s::radioframe_alloc_period_opts::n8;
+  }
+    else if (nmbsfn_period==16)
+  {
+    cell_common_list->get_cc_idx(cc_idx)->sib2.mbsfn_sf_cfg_list[0].radioframe_alloc_period .value =mbsfn_sf_cfg_s::radioframe_alloc_period_opts::n16;
+  }
+    else
+  {
+    cell_common_list->get_cc_idx(cc_idx)->sib2.mbsfn_sf_cfg_list[0].radioframe_alloc_period .value =mbsfn_sf_cfg_s::radioframe_alloc_period_opts::n32;
+  } 
+
+    cell_common_list->get_cc_idx(cc_idx)->sib2.mbsfn_sf_cfg_list[0].sf_alloc.set_one_frame().from_number(nmbsfn_sfalloc);
+    // merkebu
     enb_cell_common* cell_ctxt = cell_common_list->get_cc_idx(cc_idx);
     // msg is array of SI messages, each SI message msg[i] may contain multiple SIBs
     // all SIBs in a SI message msg[i] share the same periodicity
+
     asn1::dyn_array<bcch_dl_sch_msg_s> msg(nof_messages + 1);
 
     // Copy SIB1 to first SI message
@@ -815,6 +861,7 @@ uint32_t rrc::generate_sibs()
       // SIB2 always in second SI message
       if (msg_index == 1) {
         sib_info_item_c sibitem;
+
         sibitem.set_sib2() = cell_ctxt->sib2;
         sib_list.push_back(sibitem);
       }
@@ -825,9 +872,12 @@ uint32_t rrc::generate_sibs()
       }
     }
 
+    cell_ctxt->sib_buffer.clear(); // Merkebu reset the sib buffer. Without this the sib_buffer vector keeps expanding in size, cascading each newly generated sib
+    srsran::unique_byte_buffer_t sib_buffer;
+
     // Pack payload for all messages
     for (uint32_t msg_index = 0; msg_index < nof_messages; msg_index++) {
-      srsran::unique_byte_buffer_t sib_buffer = srsran::make_byte_buffer();
+      sib_buffer = srsran::make_byte_buffer();
       if (sib_buffer == nullptr) {
         logger.error("Couldn't allocate PDU in %s().", __FUNCTION__);
         return SRSRAN_ERROR;
@@ -838,12 +888,14 @@ uint32_t rrc::generate_sibs()
         return SRSRAN_ERROR;
       }
       sib_buffer->N_bytes = bref.distance_bytes();
+
       cell_ctxt->sib_buffer.push_back(std::move(sib_buffer));
 
-      // Log SIBs in JSON format
       std::string log_msg("CC" + std::to_string(cc_idx) + " SIB payload");
       log_rrc_message(
           log_msg, Tx, cell_ctxt->sib_buffer.back().get(), msg[msg_index], msg[msg_index].msg.c1().type().to_string());
+      // cout<<log_msg <<Tx<<cell_ctxt->sib_buffer.back().get()<<
+      // msg[msg_index]<<msg[msg_index].msg.c1().type().to_string();
     }
 
     if (cfg.sibs[6].type() == asn1::rrc::sys_info_r8_ies_s::sib_type_and_info_item_c_::types::sib7) {
@@ -866,10 +918,38 @@ void rrc::configure_mbsfn_sibs()
     sibs2.mbsfn_sf_cfg_list[i].nof_alloc_subfrs = srsran::mbsfn_sf_cfg_t::sf_alloc_type_t::one_frame;
     sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_offset =
         cfg.sibs[1].sib2().mbsfn_sf_cfg_list[i].radioframe_alloc_offset;
-    sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_period =
-        (srsran::mbsfn_sf_cfg_t::alloc_period_t)cfg.sibs[1].sib2().mbsfn_sf_cfg_list[i].radioframe_alloc_period.value;
-    sibs2.mbsfn_sf_cfg_list[i].sf_alloc =
-        (uint32_t)cfg.sibs[1].sib2().mbsfn_sf_cfg_list[i].sf_alloc.one_frame().to_number();
+    // sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_period =
+    // (srsran::mbsfn_sf_cfg_t::alloc_period_t)cfg.sibs[1].sib2().mbsfn_sf_cfg_list[i].radioframe_alloc_period.value;
+    string mbsfn_periodname;
+    int      mbsfn_period;
+    string      mbsfn_sfallocname;
+    int      mbsfn_sfalloc;
+    ifstream txmute("/home/merkebu/srsRAN/srsenb/mbsfn_set.txt");
+    
+    txmute >>mbsfn_sfallocname;
+    txmute>>mbsfn_sfalloc;
+    txmute>> mbsfn_periodname;
+    txmute>>mbsfn_period;
+    
+    if (mbsfn_period == 1) {
+      sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_period = srsran::mbsfn_sf_cfg_t::alloc_period_t::n1;
+    } else if (mbsfn_period == 2) {
+      sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_period = srsran::mbsfn_sf_cfg_t::alloc_period_t::n2;
+    } else if (mbsfn_period == 4) {
+      sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_period = srsran::mbsfn_sf_cfg_t::alloc_period_t::n4;
+    } else if (mbsfn_period == 8) {
+      sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_period = srsran::mbsfn_sf_cfg_t::alloc_period_t::n8;
+    } else if (mbsfn_period == 16) {
+      sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_period = srsran::mbsfn_sf_cfg_t::alloc_period_t::n16;
+    } else {
+      sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_period = srsran::mbsfn_sf_cfg_t::alloc_period_t::n32;
+    }
+
+/*     int      nmbsfn_sfalloc;
+    ifstream txmute("/home/merkebu/srsRAN/srsenb/mbsfn_sfalloc.txt");
+    txmute >> nmbsfn_sfalloc; */
+    cfg.sibs[1].sib2().mbsfn_sf_cfg_list[0].sf_alloc.set_one_frame().from_number(mbsfn_sfalloc); // merkebu
+    sibs2.mbsfn_sf_cfg_list[i].sf_alloc = mbsfn_sfalloc;                                         //
   }
   // populate struct with sib13 values needed for PHY/MAC
   srsran::sib13_t sibs13;
