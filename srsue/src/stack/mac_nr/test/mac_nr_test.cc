@@ -72,6 +72,7 @@ public:
   virtual void ra_completed() {}
   virtual void ra_problem() {}
   virtual void release_pucch_srs() {}
+  virtual void my()  {}  //merkebu
 };
 
 class stack_dummy : public stack_test_dummy

@@ -261,7 +261,8 @@ rrc::si_acquire_proc::si_acquire_proc(rrc* parent_) :
 }
 
 proc_outcome_t rrc::si_acquire_proc::init(uint32_t sib_index_)
-{
+{ 
+  
   // make sure we dont already have the SIB of interest
   if (rrc_ptr->meas_cells.serving_cell().has_sib(sib_index_)) {
     Info("The UE has already acquired SIB%d", sib_index + 1);
@@ -294,6 +295,43 @@ proc_outcome_t rrc::si_acquire_proc::init(uint32_t sib_index_)
   return proc_outcome_t::yield;
 }
 
+
+proc_outcome_t rrc::si_acquire_proc::myinit(uint32_t sib_index_)
+{ 
+  
+  // make sure we dont already have the SIB of interest
+  /*if (rrc_ptr->meas_cells.serving_cell().has_sib(sib_index_)) {
+    Info("The UE has already acquired SIB%d", sib_index + 1);
+    return proc_outcome_t::success;
+  }*/
+  Info("Starting SI Acquisition procedure for SIB%d", sib_index_ + 1);
+
+  // make sure SIB1 is captured before other SIBs
+  sib_index = sib_index_;
+  if (sib_index > 0 and not rrc_ptr->meas_cells.serving_cell().has_sib1()) {
+    Error("Trying to acquire SIB%d but SIB1 not received yet", sib_index + 1);
+    return proc_outcome_t::error;
+  }
+
+  // compute the si-Periodicity and schedInfoList index
+  auto ret = compute_si_periodicity_and_idx(sib_index, rrc_ptr->meas_cells.serving_cell().sib1ptr());
+  if (ret.second < 0) {
+    Info("Could not find SIB%d scheduling in SIB1", sib_index + 1);
+    return proc_outcome_t::error;
+  }
+  period      = ret.first;  // si-Periodicity
+  sched_index = ret.second; // order index of SI in schedInfoList
+
+  // trigger new SI acquisition procedure in MAC
+  start_si_acquire();
+
+  // start timeout timer
+  si_acq_timeout.run();
+
+  return proc_outcome_t::yield;
+}
+
+
 void rrc::si_acquire_proc::then(const srsran::proc_state_t& result)
 {
   // make sure timers are stopped
@@ -302,6 +340,7 @@ void rrc::si_acquire_proc::then(const srsran::proc_state_t& result)
 
   if (result.is_success()) {
     Info("SIB%d acquired successfully", sib_index + 1);
+    //printf("\n SIB%d acquired successfully\n", sib_index + 1); //Merkebu
   } else {
     Error("Failed to acquire SIB%d", sib_index + 1);
   }
@@ -310,9 +349,10 @@ void rrc::si_acquire_proc::then(const srsran::proc_state_t& result)
 void rrc::si_acquire_proc::start_si_acquire()
 {
   const uint32_t nof_sib_harq_retxs = 5;
-
+  
   // Instruct MAC to decode SIB (non-blocking)
   tti_point tti = rrc_ptr->stack->get_current_tti();
+   
   auto      ret =
       compute_si_window(tti.to_uint(), sib_index, sched_index, period, rrc_ptr->meas_cells.serving_cell().sib1ptr());
   tti_point si_win_start = tti_point{ret.first};
@@ -338,6 +378,13 @@ void rrc::si_acquire_proc::start_si_acquire()
        si_win_len,
        period,
        sched_index);
+       //Merkebu
+       /*printf("\n Instructed MAC to search for SIB%d, win_start=%d, win_len=%d, period=%d, sched_index=%d\n",
+       sib_index + 1,
+       si_win_start.to_uint(),
+       si_win_len,
+       period,
+       sched_index);*/
 }
 
 proc_outcome_t rrc::si_acquire_proc::react(sib_received_ev ev)
@@ -397,15 +444,18 @@ proc_outcome_t rrc::serving_cell_config_proc::init(const std::vector<uint32_t>& 
   req_idx = 0;
   return launch_sib_acquire();
 }
+ 
 
 srsran::proc_outcome_t rrc::serving_cell_config_proc::launch_sib_acquire()
 {
+  
   // Obtain the SIBs if not available or apply the configuration if available
   for (; req_idx < required_sibs.size(); req_idx++) {
     uint32_t required_sib = required_sibs[req_idx];
     if (not rrc_ptr->meas_cells.serving_cell().has_sib(required_sib)) {
       if (required_sib < 2 or rrc_ptr->meas_cells.serving_cell().is_sib_scheduled(required_sib)) {
         Info("Cell has no SIB%d. Obtaining SIB%d", required_sib + 1, required_sib + 1);
+         //printf("Cell has no SIB%d. Obtaining SIB%d", required_sib + 1, required_sib + 1);
         if (not rrc_ptr->si_acquirer.launch(&si_acquire_fut, required_sib)) {
           Error("SI Acquire is already running...");
           return proc_outcome_t::error;
@@ -417,9 +467,11 @@ srsran::proc_outcome_t rrc::serving_cell_config_proc::launch_sib_acquire()
     } else {
       // UE had SIB already. Handle its SIB
       Info("Cell has SIB%d", required_sib + 1);
+      
       switch (required_sib) {
         case 1:
           rrc_ptr->handle_sib2();
+          //printf("\n Cell has SIB%d", required_sib + 1);
           break;
         case 12:
           rrc_ptr->handle_sib13();
@@ -449,6 +501,70 @@ proc_outcome_t rrc::serving_cell_config_proc::step()
   // continue with remaining SIBs
   req_idx++;
   return launch_sib_acquire();
+}
+
+/*
+Decode update SIB and configure MAC/PHY
+Merkebu 
+ */
+proc_outcome_t rrc::serving_cell_config_proc::trigger_new_sib_acquire(const std::vector<uint32_t>& required_sibs_)
+{
+  // remove duplicates from list of required SIBs
+  required_sibs = required_sibs_;
+  std::sort(required_sibs.begin(), required_sibs.end());
+  required_sibs.erase(std::unique(required_sibs.begin(), required_sibs.end()), required_sibs.end());
+
+  Info("Starting a Serving Cell Configuration Procedure");
+
+  if (not rrc_ptr->phy->cell_is_camping()) {
+    Error("Trying to configure Cell while not camping on it");
+    return proc_outcome_t::error;
+  }
+
+  rrc_ptr->meas_cells.serving_cell().has_mcch = false;
+
+  req_idx = 0;
+  return launch_sib_acquire();
+}
+
+srsran::proc_outcome_t rrc::serving_cell_config_proc::new_sib_acquire() //Merkebu
+{
+  
+  // Obtain the SIBs if not available or apply the configuration if available
+  for (; req_idx < required_sibs.size(); req_idx++) {
+    uint32_t required_sib = required_sibs[req_idx];
+    if (not rrc_ptr->meas_cells.serving_cell().has_sib(required_sib)) {
+      if (required_sib < 2 or rrc_ptr->meas_cells.serving_cell().is_sib_scheduled(required_sib)) {
+        Info("Cell has no SIB%d. Obtaining SIB%d", required_sib + 1, required_sib + 1);
+         //printf("Cell has no SIB%d. Obtaining SIB%d", required_sib + 1, required_sib + 1);
+        if (not rrc_ptr->si_acquirer.launch(&si_acquire_fut, required_sib)) {
+          Error("SI Acquire is already running...");
+          return proc_outcome_t::error;
+        }
+        // wait for si acquire to finish
+        return proc_outcome_t::yield;
+      }
+      // SIB is not scheduled in SchedInfoList. Skipping it...
+    } else {
+      // UE had SIB already. Handle its SIB
+      Info("Cell has SIB%d", required_sib + 1);
+      
+      switch (required_sib) {
+        case 1:
+          rrc_ptr->handle_sib2();
+          //printf("\n Cell has SIB%d", required_sib + 1);
+          break;
+        case 12:
+          rrc_ptr->handle_sib13();
+          break;
+        default:
+          break;
+      }
+    }
+  }
+
+  Info("Serving Cell Configuration Procedure has finished successfully");
+  return proc_outcome_t::success;
 }
 
 /**************************************
@@ -1119,7 +1235,7 @@ proc_outcome_t rrc::process_pcch_proc::step()
       Info("Received System Information notification update request.");
       // invalidate and then update all SIBs of serving cell
       rrc_ptr->meas_cells.serving_cell().reset_sibs();
-
+      
       // create a serving cell config procedure and push it to callback list
       if (not rrc_ptr->serv_cell_cfg.launch(&serv_cfg_fut, rrc_ptr->ue_required_sibs)) {
         Error("Failed to initiate a serving cell configuration procedure");

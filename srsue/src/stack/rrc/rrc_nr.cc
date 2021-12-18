@@ -1434,6 +1434,7 @@ void rrc_nr::ra_problem()
 }
 
 void rrc_nr::release_pucch_srs() {}
+void rrc_nr::my() {} //merkebu
 
 // STACK interface
 void rrc_nr::cell_search_completed(const rrc_interface_phy_lte::cell_search_ret_t& cs_ret, const phy_cell_t& found_cell)

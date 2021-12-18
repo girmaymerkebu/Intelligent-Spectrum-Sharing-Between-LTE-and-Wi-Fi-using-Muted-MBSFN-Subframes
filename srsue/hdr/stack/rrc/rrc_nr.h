@@ -116,6 +116,7 @@ public:
   void ra_completed() final;
   void ra_problem() final;
   void release_pucch_srs() final;
+  void my() final; //Merkebu
 
   // PDCP interface
   void write_pdu(uint32_t lcid, srsran::unique_byte_buffer_t pdu) final;

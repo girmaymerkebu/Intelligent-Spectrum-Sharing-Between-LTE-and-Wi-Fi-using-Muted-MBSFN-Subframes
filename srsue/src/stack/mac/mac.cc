@@ -27,9 +27,42 @@
 #include <string.h>
 #include <strings.h>
 
+#include <iostream>
+
+
+#include "srsue/hdr/stack/rrc/rrc.h"
+#include "srsran/asn1/rrc.h"
+#include "srsran/common/bcd_helpers.h"
+#include "srsran/common/security.h"
+#include "srsran/common/standard_streams.h"
+#include "srsran/interfaces/ue_gw_interfaces.h"
+#include "srsran/interfaces/ue_nas_interfaces.h"
+#include "srsran/interfaces/ue_pdcp_interfaces.h"
+#include "srsran/interfaces/ue_rlc_interfaces.h"
+#include "srsran/interfaces/ue_usim_interfaces.h"
+#include "srsue/hdr/stack/rrc/phy_controller.h"
+#include "srsue/hdr/stack/rrc/rrc_meas.h"
+#include "srsue/hdr/stack/rrc/rrc_procedures.h"
+
+#include <cstdlib>
+#include <ctime>
+#include <inttypes.h> // for printing uint64_t
+#include <iostream>
+#include <math.h>
+#include <numeric>
+#include <string.h>
+#include <string>
+#include <iostream>
+
+
+
+
 #include "srsran/common/pcap.h"
 #include "srsran/interfaces/ue_phy_interfaces.h"
 #include "srsue/hdr/stack/mac/mac.h"
+#include "srsue/hdr/stack/rrc/rrc_procedures.h"
+
+
 
 namespace srsue {
 
@@ -302,8 +335,13 @@ bool mac::is_in_window(uint32_t tti, int* start, int* len)
 
 uint16_t mac::get_dl_sched_rnti(uint32_t tti)
 {
+  if (tti%160==0){
+ rrc_h->my(); //merkebu
+  }
+  //std::cout<<tti;
   // Priority: SI-RNTI, P-RNTI, RA-RNTI, Temp-RNTI, CRNTI
   if (si_window_start > 0) {
+    
     if (is_in_window(tti, &si_window_start, &si_window_length)) {
       // TODO: This scheduling decision belongs to RRC
       if (si_window_length > 1) {                     // This is not a SIB1
@@ -477,7 +515,9 @@ void mac::new_grant_dl(uint32_t                               cc_idx,
   }
 }
 
-void mac::process_pdus()
+void mac::
+
+process_pdus()
 {
   // dispatch work to stack thread
   auto ret = stack_task_dispatch_queue.try_push([this]() {
