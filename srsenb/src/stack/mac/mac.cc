@@ -850,12 +850,16 @@ if ((0.95*total_space_avail_bytes_new > total_bytes_to_tx) {
   if(mbsfn_sfalloc>1)){
     //(decrease the sfs i.e. sfalloc--)
     mbsfn_sfalloc=((mbsfn_sfalloc+1)/2)-1;}
-  else if (mbsfn_period<31){
+  else if (mbsfn_period<32){
     //if sf_alloc reaches 1, then increase sf_period
     mbsfn_period=2*mbsfn_period}
 }
-
-
+else
+{
+  if (mbsfn_sfalloc<63){
+  mbsfn_sfalloc=2*(mbsfn_sfalloc+1)-1;
+  }
+}
 
 
   int last_mtch_stop = 0;
