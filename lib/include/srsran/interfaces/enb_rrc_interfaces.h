@@ -119,9 +119,9 @@ public:
   ///< Provide packed SIB to MAC (buffer is managed by RRC)
   virtual uint8_t* read_pdu_bcch_dlsch(const uint8_t enb_cc_idx, const uint32_t sib_index) = 0;
     //virtual void     config_mac()=0;
-  virtual void     configure_mbsfn_sibs()  =0;
+  virtual void     configure_mbsfn_sibs(int sfalloc, int sfperiod)  =0;
  //virtual int      pack_mcch()=0;
- virtual uint32_t generate_sibs()    =0;
+ virtual uint32_t generate_sibs(int sfalloc, int sfperiod)    =0;
 };
 
 /// RRC interface for PDCP

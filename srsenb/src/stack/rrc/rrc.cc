@@ -67,7 +67,7 @@ int32_t rrc::init(const rrc_cfg_t&       cfg_,
 
   if (cfg.sibs[12].type() == asn1::rrc::sys_info_r8_ies_s::sib_type_and_info_item_c_::types::sib13_v920 &&
       cfg.enable_mbsfn) {
-    configure_mbsfn_sibs();
+    configure_mbsfn_sibs(63,1);
   }
 
   cell_res_list.reset(new freq_res_common_list{cfg});
@@ -75,7 +75,7 @@ int32_t rrc::init(const rrc_cfg_t&       cfg_,
   // Loads the PRACH root sequence
   cfg.sibs[1].sib2().rr_cfg_common.prach_cfg.root_seq_idx = cfg.cell_list[0].root_seq_idx;
   cell_common_list.reset(new enb_cell_common_list{cfg}); // merkebu
-  if (generate_sibs() != SRSRAN_SUCCESS) {
+  if (generate_sibs(63,1) != SRSRAN_SUCCESS) {
     logger.error("Couldn't generate SIBs.");
     return false;
   }
@@ -792,7 +792,7 @@ void rrc::config_mac()
  *
  * @return SRSRAN_SUCCESS on success, SRSRAN_ERROR on failure
  */
-uint32_t rrc::generate_sibs()
+uint32_t rrc::generate_sibs(int sfalloc, int sfperiod)
 {
   // nof_messages includes SIB2 by default, plus all configured SIBs
   uint32_t           nof_messages = 1 + cfg.sib1.sched_info_list.size();
@@ -805,16 +805,18 @@ uint32_t rrc::generate_sibs()
   for (uint32_t cc_idx = 0; cc_idx < cfg.cell_list.size(); cc_idx++) {
     // merkebu
 
-      string mbsfn_periodname;
-    int      nmbsfn_period;
-    string      nmbsfn_sfallocname;
-    int      nmbsfn_sfalloc;
-    ifstream txmuten("/home/merkebu/srsRAN/srsenb/mbsfn_set.txt");
+      //string mbsfn_periodname;
+    //int      nmbsfn_period;
+    int      nmbsfn_period=sfperiod;
+    //string      nmbsfn_sfallocname;
+    //int      nmbsfn_sfalloc;
+    int      nmbsfn_sfalloc=sfalloc;
+    //ifstream txmuten("/home/merkebu/srsRAN/srsenb/mbsfn_set.txt");
    
-    txmuten >>nmbsfn_sfallocname;
-    txmuten>>nmbsfn_sfalloc;
-    txmuten>> mbsfn_periodname;
-    txmuten>>nmbsfn_period;
+    //txmuten >>nmbsfn_sfallocname;
+    //txmuten>>nmbsfn_sfalloc;
+    //txmuten>> mbsfn_periodname;
+    //txmuten>>nmbsfn_period;
     if (nmbsfn_period == 1) {
       cell_common_list->get_cc_idx(cc_idx)->sib2.mbsfn_sf_cfg_list[0].radioframe_alloc_period.value =mbsfn_sf_cfg_s::radioframe_alloc_period_opts::n1;
     }
@@ -908,7 +910,7 @@ uint32_t rrc::generate_sibs()
   return SRSRAN_SUCCESS;
 }
 
-void rrc::configure_mbsfn_sibs()
+void rrc::configure_mbsfn_sibs(int sfalloc, int sfperiod)
 {
   // populate struct with sib2 values needed in PHY/MAC
   srsran::sib2_mbms_t sibs2;
@@ -920,16 +922,18 @@ void rrc::configure_mbsfn_sibs()
         cfg.sibs[1].sib2().mbsfn_sf_cfg_list[i].radioframe_alloc_offset;
     // sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_period =
     // (srsran::mbsfn_sf_cfg_t::alloc_period_t)cfg.sibs[1].sib2().mbsfn_sf_cfg_list[i].radioframe_alloc_period.value;
-    string mbsfn_periodname;
-    int      mbsfn_period;
-    string      mbsfn_sfallocname;
-    int      mbsfn_sfalloc;
-    ifstream txmute("/home/merkebu/srsRAN/srsenb/mbsfn_set.txt");
+    //string mbsfn_periodname;
+    //int      mbsfn_period;
+    int      mbsfn_period=sfperiod;
+    //string      mbsfn_sfallocname;
+    //int      mbsfn_sfalloc;
+    int      mbsfn_sfalloc=sfalloc;
+    //ifstream txmute("/home/merkebu/srsRAN/srsenb/mbsfn_set.txt");
     
-    txmute >>mbsfn_sfallocname;
-    txmute>>mbsfn_sfalloc;
-    txmute>> mbsfn_periodname;
-    txmute>>mbsfn_period;
+    //txmute >>mbsfn_sfallocname;
+    //txmute>>mbsfn_sfalloc;
+    //txmute>> mbsfn_periodname;
+    //txmute>>mbsfn_period;
     
     if (mbsfn_period == 1) {
       sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_period = srsran::mbsfn_sf_cfg_t::alloc_period_t::n1;
