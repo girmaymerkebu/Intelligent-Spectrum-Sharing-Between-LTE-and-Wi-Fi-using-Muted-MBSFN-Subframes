@@ -49,9 +49,9 @@ public:
   bool     is_paging_opportunity(uint32_t tti, uint32_t* payload_len) { return false; }
   uint8_t* read_pdu_bcch_dlsch(const uint8_t enb_cc_idx, const uint32_t sib_index) { return nullptr; }
    // void     config_mac() {}
-  void    configure_mbsfn_sibs() {}
+  void    configure_mbsfn_sibs(int sfalloc, int sfperiod) {}
  //int      pack_mcch() { return SRSRAN_SUCCESS; }
- uint32_t generate_sibs() { return SRSRAN_SUCCESS; }
+ uint32_t generate_sibs(int sfalloc, int sfperiod) { return SRSRAN_SUCCESS; }
 };
 
 /**************************
