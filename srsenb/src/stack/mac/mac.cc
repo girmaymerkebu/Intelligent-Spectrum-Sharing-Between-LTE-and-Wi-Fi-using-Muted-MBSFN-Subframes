@@ -31,6 +31,11 @@
 #include "srsran/interfaces/enb_rlc_interfaces.h"
 #include "srsran/interfaces/enb_rrc_interfaces.h"
 #include "srsran/srslog/event_trace.h"
+#include <bitset>
+#include <fstream>
+#include <iostream>
+#include <string> 
+using namespace std; 
 
 // #define WRITE_SIB_PCAP
 using namespace asn1::rrc;
@@ -158,6 +163,7 @@ void mac::start_pcap_net(srsran::mac_pcap_net* pcap_net_)
  *******************************************************/
 int mac::rlc_buffer_state(uint16_t rnti, uint32_t lc_id, uint32_t tx_queue, uint32_t retx_queue)
 {
+  //printf("Tx queue is = %d\n",tx_queue);
   srsran::rwlock_read_guard lock(rwlock);
   int                       ret = -1;
   if (ue_db.contains(rnti)) {
@@ -723,11 +729,11 @@ int mac::get_dl_sched(uint32_t tti_tx_dl, dl_sched_list_t& dl_sched_res_list)
 
       // Set softbuffer
       if (sched_result.bc[i].type == sched_interface::dl_sched_bc_t::BCCH) {
-          if (tti_tx_dl%15==0){
-            rrc_h->configure_mbsfn_sibs();
-            rrc_h->generate_sibs(); 
+          //if (tti_tx_dl%15==0){
+            //rrc_h->configure_mbsfn_sibs(); 
+            //rrc_h->generate_sibs(); 
             //std::cout<<tti_tx_dl<<"\t here \t";
-          }
+          //}
         dl_sched_res->pdsch[n].softbuffer_tx[0] =
             &common_buffers[enb_cc_idx].bcch_softbuffer_tx[sched_result.bc[i].index];
         dl_sched_res->pdsch[n].data[0] = rrc_h->read_pdu_bcch_dlsch(enb_cc_idx, sched_result.bc[i].index);
@@ -779,15 +785,78 @@ void mac::build_mch_sched(uint32_t tbs)
   int sfs_per_sched_period = mcch.pmch_info_list[0].sf_alloc_end;
   int bytes_per_sf         = tbs / 8 - 6; // leave 6 bytes for header
 
+    //string mbsfn_periodname;
+    static int      mbsfn_period=1;
+   //string      mbsfn_sfallocname;
+    static int      mbsfn_sfalloc=63;
+    //ifstream txmute("/home/idlab094/algo_1/adaptive-sf-allocation-multicast_unicast/srsenb/mbsfn_set.txt");
+    
+    //txmute >>mbsfn_sfallocname;
+    //txmute>>mbsfn_sfalloc;
+    //txmute>> mbsfn_periodname;
+    //txmute>>mbsfn_period;
+
+    rrc_h->configure_mbsfn_sibs(mbsfn_sfalloc, mbsfn_period); 
+    rrc_h->generate_sibs(mbsfn_sfalloc, mbsfn_period); 
+
+
   int total_space_avail_bytes = sfs_per_sched_period * bytes_per_sf;
+  int mbsfn_sfalloc_new=0; 
+  if (mbsfn_sfalloc ==63)
+  {
+  	mbsfn_sfalloc_new = 6;
+  	}
+  	else if (mbsfn_sfalloc ==31) 
+  	{mbsfn_sfalloc_new = 5;}
+  	
+  	else if (mbsfn_sfalloc ==15) 
+  	{mbsfn_sfalloc_new = 4;}
+  	
+  	else if (mbsfn_sfalloc ==7) 
+  	{mbsfn_sfalloc_new = 3;}
+  	
+  	else if (mbsfn_sfalloc ==3) 
+  	{mbsfn_sfalloc_new = 2;}
+  	
+  	else if (mbsfn_sfalloc ==1) 
+  	{mbsfn_sfalloc_new = 1;}
+  	
+  int total_space_avail_bytes_new = bytes_per_sf * mbsfn_sfalloc_new *64/mbsfn_period;
+  
+  // write code for checks, increase, decrease  
+  // always start from (63,1) conf and then look on parameters, 
+  // if 95% of total_space_avail_bytes_new > total_bytes_to_tx (decrease the sfs i.e. sfalloc--)
+  //if sf_alloc reaches 1, then increase sf_period
+  
+   
 
   int total_bytes_to_tx = 0;
+
+  printf("tbs = %d\n",tbs); 
+  printf("sfs_per_sched_period = %d\n",sfs_per_sched_period);
+  printf("bytes_per_sf = %d\n",bytes_per_sf);
+  printf("total_space_avail_bytes = %d\n",total_space_avail_bytes_new);
 
   // calculate total bytes to be scheduled
   for (uint32_t i = 0; i < mch.num_mtch_sched; i++) {
     total_bytes_to_tx += mch.mtch_sched[i].lcid_buffer_size;
     mch.mtch_sched[i].stop = 0;
+    printf("total_bytes_to_tx = %d\n\n",total_bytes_to_tx); 
   }
+
+
+//Merkebu: update the mbsfn_sfalloc and mbsfn_period based on the TX queue
+if ((0.95*total_space_avail_bytes_new > total_bytes_to_tx) {
+  if(mbsfn_sfalloc>1)){
+    //(decrease the sfs i.e. sfalloc--)
+    mbsfn_sfalloc=((mbsfn_sfalloc+1)/2)-1;}
+  else if (mbsfn_period<31){
+    //if sf_alloc reaches 1, then increase sf_period
+    mbsfn_period=2*mbsfn_period}
+}
+
+
+
 
   int last_mtch_stop = 0;
 
@@ -860,6 +929,9 @@ int mac::get_mch_sched(uint32_t tti, bool is_mcch, dl_sched_list_t& dl_sched_res
       mch.pdu[0].lcid    = current_lcid;
       mch.pdu[0].nbytes  = bytes_received;
       mch.mtch_sched[0].mtch_payload  = mtch_payload_buffer;
+      
+      //printf("requested bytes = %d\n",requested_bytes); 
+      
       dl_sched_res->pdsch[0].dci.rnti = SRSRAN_MRNTI;
       if (bytes_received) {
         ue_db[SRSRAN_MRNTI]->metrics_tx(true, mcs.tbs);
@@ -1024,6 +1096,9 @@ void mac::write_mcch(const srsran::sib2_mbms_t* sib2_,
   sib13 = *sib13_;
   memcpy(mcch_payload_buffer, mcch_payload, mcch_payload_length * sizeof(uint8_t));
   current_mcch_length = mcch_payload_length;
+  
+  //printf("mcch_payload = %c\n\n",mcch_payload);
+  
   std::unique_ptr<ue> ptr = std::unique_ptr<ue>{
       new ue(SRSRAN_MRNTI, args.nof_prb, &scheduler, rrc_h, rlc_h, phy_h, logger, cells.size(), softbuffer_pool.get())};
   auto ret = ue_db.insert(SRSRAN_MRNTI, std::move(ptr));
