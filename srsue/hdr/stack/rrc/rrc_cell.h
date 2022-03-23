@@ -111,7 +111,7 @@ protected:
   float rsrq = NAN;
 
   bool                         has_valid_sib1  = false;
-  //bool                         has_valid_sib2  = false; merkebu
+  //bool                         has_valid_sib2  = false; 
   bool                         has_valid_sib3  = false;
   bool                         has_valid_sib13 = false;
   std::map<uint32_t, uint32_t> sib_info_map; ///< map of sib_index to index of schedInfoList in SIB1

@@ -340,7 +340,7 @@ void rrc::si_acquire_proc::then(const srsran::proc_state_t& result)
 
   if (result.is_success()) {
     Info("SIB%d acquired successfully", sib_index + 1);
-    //printf("\n SIB%d acquired successfully\n", sib_index + 1); //Merkebu
+    
   } else {
     Error("Failed to acquire SIB%d", sib_index + 1);
   }
@@ -378,13 +378,7 @@ void rrc::si_acquire_proc::start_si_acquire()
        si_win_len,
        period,
        sched_index);
-       //Merkebu
-       /*printf("\n Instructed MAC to search for SIB%d, win_start=%d, win_len=%d, period=%d, sched_index=%d\n",
-       sib_index + 1,
-       si_win_start.to_uint(),
-       si_win_len,
-       period,
-       sched_index);*/
+  
 }
 
 proc_outcome_t rrc::si_acquire_proc::react(sib_received_ev ev)
@@ -505,7 +499,7 @@ proc_outcome_t rrc::serving_cell_config_proc::step()
 
 /*
 Decode update SIB and configure MAC/PHY
-Merkebu 
+
  */
 proc_outcome_t rrc::serving_cell_config_proc::trigger_new_sib_acquire(const std::vector<uint32_t>& required_sibs_)
 {
@@ -527,7 +521,7 @@ proc_outcome_t rrc::serving_cell_config_proc::trigger_new_sib_acquire(const std:
   return launch_sib_acquire();
 }
 
-srsran::proc_outcome_t rrc::serving_cell_config_proc::new_sib_acquire() //Merkebu
+srsran::proc_outcome_t rrc::serving_cell_config_proc::new_sib_acquire() 
 {
   
   // Obtain the SIBs if not available or apply the configuration if available

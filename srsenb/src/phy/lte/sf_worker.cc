@@ -231,6 +231,8 @@ void sf_worker::work_imp()
 
   // Configure DL subframe
   dl_sf.tti              = tti_tx_dl;
+  
+  
   dl_sf.sf_type          = sf_type;
   dl_sf.non_mbsfn_region = mbsfn_cfg.non_mbsfn_region_length;
 

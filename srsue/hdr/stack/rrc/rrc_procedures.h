@@ -83,10 +83,10 @@ public:
   srsran::proc_outcome_t react(si_acq_timer_expired ev);
   srsran::proc_outcome_t react(sib_received_ev ev);
   void                   then(const srsran::proc_state_t& result);
-  void start_si_acquire(); //merkebu
+  void start_si_acquire(); 
   
 private:
-  //void start_si_acquire(); //merkebu
+  //void start_si_acquire(); 
 
   // conts
   rrc*                  rrc_ptr;
@@ -105,15 +105,15 @@ public:
   srsran::proc_outcome_t init(const std::vector<uint32_t>& required_sibs_);
   srsran::proc_outcome_t step();
   static const char*     name() { return "Serving Cell Configuration"; }
-  srsran::proc_outcome_t launch_sib_acquire(); //merkebu made public
-  srsran::proc_outcome_t new_sib_acquire(); //merkebu added
+  srsran::proc_outcome_t launch_sib_acquire(); 
+  srsran::proc_outcome_t new_sib_acquire(); 
   srsran::proc_outcome_t trigger_new_sib_acquire(const std::vector<uint32_t>& required_sibs_);
   
 private:
   rrc*                  rrc_ptr;
   srslog::basic_logger& logger;
 
-  //srsran::proc_outcome_t launch_sib_acquire(); //merkebu
+  //srsran::proc_outcome_t launch_sib_acquire(); 
   
 
   // proc args
@@ -136,7 +136,7 @@ public:
   static const char*     name() { return "Cell Selection"; }
   srsran::proc_outcome_t react(const bool& event);
   void                   then(const srsran::proc_result_t<cs_result_t>& proc_result) const;
-  srsran::proc_outcome_t start_sib_acquisition(); //merkebu
+  srsran::proc_outcome_t start_sib_acquisition(); 
 private:
   srsran::proc_outcome_t start_next_cell_selection();
   srsran::proc_outcome_t step_cell_search();
@@ -145,7 +145,7 @@ private:
   bool                   is_sib_acq_required() const;
   srsran::proc_outcome_t set_proc_complete();
   srsran::proc_outcome_t start_phy_cell_selection(const meas_cell_eutra& cell);
-  //srsran::proc_outcome_t start_sib_acquisition(); //merkebu
+  //srsran::proc_outcome_t start_sib_acquisition(); 
 
   // consts
   rrc*                             rrc_ptr;

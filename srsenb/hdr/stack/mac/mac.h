@@ -78,6 +78,8 @@ public:
     scheduler.set_dl_tti_mask(tti_mask, nof_sfs);
   }
   void build_mch_sched(uint32_t tbs);
+  
+  int binarySearch(int arr[], int left, int right, int x);
 
   /******** Interface from RRC (RRC -> MAC) ****************/
   /* Provides cell configuration including SIB periodicity, etc. */

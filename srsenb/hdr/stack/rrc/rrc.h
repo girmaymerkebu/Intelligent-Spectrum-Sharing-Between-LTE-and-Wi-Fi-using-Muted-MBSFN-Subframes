@@ -179,7 +179,9 @@ private:
   void     process_release_complete(uint16_t rnti);
   void     rem_user(uint16_t rnti);
   uint32_t generate_sibs(int sfalloc, int sfperiod);
+  uint32_t generate_sibsn();
   void     configure_mbsfn_sibs(int sfalloc, int sfperiod);
+  void     configure_mbsfn_sibsn();
   int      pack_mcch();
 
   void config_mac();

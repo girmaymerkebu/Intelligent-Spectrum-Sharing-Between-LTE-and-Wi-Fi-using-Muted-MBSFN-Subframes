@@ -118,6 +118,7 @@ void phy_common::worker_end(void* tx_sem_id, srsran::rf_buffer_t& buffer, srsran
   // Wait for the green light to transmit in the current TTI
   semaphore.wait(tx_sem_id);
 
+
   // If this is for NR, save Tx buffers...
   if (is_nr) {
     nr_tx_buffer       = buffer;

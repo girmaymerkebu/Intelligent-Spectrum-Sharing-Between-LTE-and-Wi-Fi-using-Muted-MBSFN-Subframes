@@ -378,7 +378,7 @@ private:
   void handle_sib2();
   void handle_sib3();
   void handle_sib13();
-  void my(); //merkebu
+  void my(); 
 
   void     handle_con_setup(const asn1::rrc::rrc_conn_setup_s& setup);
   void     handle_con_reest(const asn1::rrc::rrc_conn_reest_s& setup);

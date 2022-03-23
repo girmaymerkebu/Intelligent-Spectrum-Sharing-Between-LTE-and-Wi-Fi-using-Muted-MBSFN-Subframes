@@ -67,15 +67,15 @@ int32_t rrc::init(const rrc_cfg_t&       cfg_,
 
   if (cfg.sibs[12].type() == asn1::rrc::sys_info_r8_ies_s::sib_type_and_info_item_c_::types::sib13_v920 &&
       cfg.enable_mbsfn) {
-    configure_mbsfn_sibs(63,1);
+    configure_mbsfn_sibsn();
   }
 
   cell_res_list.reset(new freq_res_common_list{cfg});
 
   // Loads the PRACH root sequence
   cfg.sibs[1].sib2().rr_cfg_common.prach_cfg.root_seq_idx = cfg.cell_list[0].root_seq_idx;
-  cell_common_list.reset(new enb_cell_common_list{cfg}); // merkebu
-  if (generate_sibs(63,1) != SRSRAN_SUCCESS) {
+  cell_common_list.reset(new enb_cell_common_list{cfg}); 
+  if (generate_sibsn() != SRSRAN_SUCCESS) {
     logger.error("Couldn't generate SIBs.");
     return false;
   }
@@ -135,8 +135,6 @@ void rrc::get_metrics(rrc_metrics_t& m)
 uint8_t* rrc::read_pdu_bcch_dlsch(const uint8_t cc_idx, const uint32_t sib_index)
 {
   if (sib_index < ASN1_RRC_MAX_SIB && cc_idx < cell_common_list->nof_cells()) {
-    // Merkebu check sib buffer size
-    // cout<<cell_common_list->get_cc_idx(cc_idx)->sib_buffer;
     return cell_common_list->get_cc_idx(cc_idx)->sib_buffer.at(sib_index)->msg;
   }
   return nullptr;
@@ -792,31 +790,19 @@ void rrc::config_mac()
  *
  * @return SRSRAN_SUCCESS on success, SRSRAN_ERROR on failure
  */
-uint32_t rrc::generate_sibs(int sfalloc, int sfperiod)
+
+uint32_t rrc::generate_sibsn()
 {
   // nof_messages includes SIB2 by default, plus all configured SIBs
   uint32_t           nof_messages = 1 + cfg.sib1.sched_info_list.size();
   sched_info_list_l& sched_info   = cfg.sib1.sched_info_list;
 
-  // Store configs,SIBs in common cell ctxt list
-  // cell_common_list.reset(new enb_cell_common_list{cfg}); //Merkebu this creates reconfiguration error
-
   // generate and pack into SIB buffers
   for (uint32_t cc_idx = 0; cc_idx < cfg.cell_list.size(); cc_idx++) {
-    // merkebu
-
-      //string mbsfn_periodname;
-    //int      nmbsfn_period;
-    int      nmbsfn_period=sfperiod;
-    //string      nmbsfn_sfallocname;
-    //int      nmbsfn_sfalloc;
-    int      nmbsfn_sfalloc=sfalloc;
-    //ifstream txmuten("/home/merkebu/srsRAN/srsenb/mbsfn_set.txt");
-   
-    //txmuten >>nmbsfn_sfallocname;
-    //txmuten>>nmbsfn_sfalloc;
-    //txmuten>> mbsfn_periodname;
-    //txmuten>>nmbsfn_period;
+    
+    int nmbsfn_period = 1;
+    int nmbsfn_sfalloc = 63;
+    
     if (nmbsfn_period == 1) {
       cell_common_list->get_cc_idx(cc_idx)->sib2.mbsfn_sf_cfg_list[0].radioframe_alloc_period.value =mbsfn_sf_cfg_s::radioframe_alloc_period_opts::n1;
     }
@@ -842,7 +828,7 @@ uint32_t rrc::generate_sibs(int sfalloc, int sfperiod)
   } 
 
     cell_common_list->get_cc_idx(cc_idx)->sib2.mbsfn_sf_cfg_list[0].sf_alloc.set_one_frame().from_number(nmbsfn_sfalloc);
-    // merkebu
+ 
     enb_cell_common* cell_ctxt = cell_common_list->get_cc_idx(cc_idx);
     // msg is array of SI messages, each SI message msg[i] may contain multiple SIBs
     // all SIBs in a SI message msg[i] share the same periodicity
@@ -874,7 +860,7 @@ uint32_t rrc::generate_sibs(int sfalloc, int sfperiod)
       }
     }
 
-    cell_ctxt->sib_buffer.clear(); // Merkebu reset the sib buffer. Without this the sib_buffer vector keeps expanding in size, cascading each newly generated sib
+    cell_ctxt->sib_buffer.clear(); // reset the sib buffer. Without this the sib_buffer vector keeps expanding in size, cascading each newly generated sib
     srsran::unique_byte_buffer_t sib_buffer;
 
     // Pack payload for all messages
@@ -896,8 +882,206 @@ uint32_t rrc::generate_sibs(int sfalloc, int sfperiod)
       std::string log_msg("CC" + std::to_string(cc_idx) + " SIB payload");
       log_rrc_message(
           log_msg, Tx, cell_ctxt->sib_buffer.back().get(), msg[msg_index], msg[msg_index].msg.c1().type().to_string());
-      // cout<<log_msg <<Tx<<cell_ctxt->sib_buffer.back().get()<<
-      // msg[msg_index]<<msg[msg_index].msg.c1().type().to_string();
+    }
+
+    if (cfg.sibs[6].type() == asn1::rrc::sys_info_r8_ies_s::sib_type_and_info_item_c_::types::sib7) {
+      sib7 = cfg.sibs[6].sib7();
+    }
+  }
+
+  nof_si_messages = nof_messages;
+
+  return SRSRAN_SUCCESS;
+}
+
+void rrc::configure_mbsfn_sibsn()
+{
+  // populate struct with sib2 values needed in PHY/MAC
+  srsran::sib2_mbms_t sibs2;
+  sibs2.mbsfn_sf_cfg_list_present = cfg.sibs[1].sib2().mbsfn_sf_cfg_list_present;
+  sibs2.nof_mbsfn_sf_cfg          = cfg.sibs[1].sib2().mbsfn_sf_cfg_list.size();
+  for (int i = 0; i < sibs2.nof_mbsfn_sf_cfg; i++) {
+    sibs2.mbsfn_sf_cfg_list[i].nof_alloc_subfrs = srsran::mbsfn_sf_cfg_t::sf_alloc_type_t::one_frame;
+    sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_offset =
+        cfg.sibs[1].sib2().mbsfn_sf_cfg_list[i].radioframe_alloc_offset;
+    
+    int mbsfn_period = 1;
+    int mbsfn_sfalloc = 63;
+    
+    if (mbsfn_period == 1) {
+      sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_period = srsran::mbsfn_sf_cfg_t::alloc_period_t::n1;
+    } else if (mbsfn_period == 2) {
+      sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_period = srsran::mbsfn_sf_cfg_t::alloc_period_t::n2;
+    } else if (mbsfn_period == 4) {
+      sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_period = srsran::mbsfn_sf_cfg_t::alloc_period_t::n4;
+    } else if (mbsfn_period == 8) {
+      sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_period = srsran::mbsfn_sf_cfg_t::alloc_period_t::n8;
+    } else if (mbsfn_period == 16) {
+      sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_period = srsran::mbsfn_sf_cfg_t::alloc_period_t::n16;
+    } else {
+      sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_period = srsran::mbsfn_sf_cfg_t::alloc_period_t::n32;
+    }
+
+    cfg.sibs[1].sib2().mbsfn_sf_cfg_list[0].sf_alloc.set_one_frame().from_number(mbsfn_sfalloc); 
+    sibs2.mbsfn_sf_cfg_list[i].sf_alloc = mbsfn_sfalloc;                                         
+  }
+  // populate struct with sib13 values needed for PHY/MAC
+  srsran::sib13_t sibs13;
+  sibs13.notif_cfg.notif_offset = cfg.sibs[12].sib13_v920().notif_cfg_r9.notif_offset_r9;
+  sibs13.notif_cfg.notif_repeat_coeff =
+      (srsran::mbms_notif_cfg_t::coeff_t)cfg.sibs[12].sib13_v920().notif_cfg_r9.notif_repeat_coeff_r9.value;
+  sibs13.notif_cfg.notif_sf_idx = cfg.sibs[12].sib13_v920().notif_cfg_r9.notif_sf_idx_r9;
+  sibs13.nof_mbsfn_area_info    = cfg.sibs[12].sib13_v920().mbsfn_area_info_list_r9.size();
+  for (uint32_t i = 0; i < sibs13.nof_mbsfn_area_info; i++) {
+    sibs13.mbsfn_area_info_list[i].mbsfn_area_id =
+        cfg.sibs[12].sib13_v920().mbsfn_area_info_list_r9[i].mbsfn_area_id_r9;
+    sibs13.mbsfn_area_info_list[i].notif_ind        = cfg.sibs[12].sib13_v920().mbsfn_area_info_list_r9[i].notif_ind_r9;
+    sibs13.mbsfn_area_info_list[i].mcch_cfg.sig_mcs = (srsran::mbsfn_area_info_t::mcch_cfg_t::sig_mcs_t)cfg.sibs[12]
+                                                          .sib13_v920()
+                                                          .mbsfn_area_info_list_r9[i]
+                                                          .mcch_cfg_r9.sig_mcs_r9.value;
+    sibs13.mbsfn_area_info_list[i].mcch_cfg.sf_alloc_info =
+        cfg.sibs[12].sib13_v920().mbsfn_area_info_list_r9[i].mcch_cfg_r9.sf_alloc_info_r9.to_number();
+    sibs13.mbsfn_area_info_list[i].mcch_cfg.mcch_repeat_period =
+        (srsran::mbsfn_area_info_t::mcch_cfg_t::repeat_period_t)cfg.sibs[12]
+            .sib13_v920()
+            .mbsfn_area_info_list_r9[i]
+            .mcch_cfg_r9.mcch_repeat_period_r9.value;
+    sibs13.mbsfn_area_info_list[i].mcch_cfg.mcch_offset =
+        cfg.sibs[12].sib13_v920().mbsfn_area_info_list_r9[i].mcch_cfg_r9.mcch_offset_r9;
+    sibs13.mbsfn_area_info_list[i].mcch_cfg.mcch_mod_period =
+        (srsran::mbsfn_area_info_t::mcch_cfg_t::mod_period_t)cfg.sibs[12]
+            .sib13_v920()
+            .mbsfn_area_info_list_r9[i]
+            .mcch_cfg_r9.mcch_mod_period_r9.value;
+    sibs13.mbsfn_area_info_list[i].non_mbsfn_region_len = (srsran::mbsfn_area_info_t::region_len_t)cfg.sibs[12]
+                                                              .sib13_v920()
+                                                              .mbsfn_area_info_list_r9[i]
+                                                              .non_mbsfn_region_len.value;
+    sibs13.mbsfn_area_info_list[i].notif_ind = cfg.sibs[12].sib13_v920().mbsfn_area_info_list_r9[i].notif_ind_r9;
+  }
+
+  // pack MCCH for transmission and pass relevant MCCH values to PHY/MAC
+  pack_mcch();
+  srsran::mcch_msg_t mcch_t;
+  mcch_t.common_sf_alloc_period         = srsran::mcch_msg_t::common_sf_alloc_period_t::rf64;
+  mcch_t.nof_common_sf_alloc            = 1;
+  srsran::mbsfn_sf_cfg_t sf_alloc_item  = mcch_t.common_sf_alloc[0];
+  sf_alloc_item.radioframe_alloc_offset = 0;
+  sf_alloc_item.radioframe_alloc_period = srsran::mbsfn_sf_cfg_t::alloc_period_t::n1;
+  sf_alloc_item.sf_alloc                = 63;
+  mcch_t.nof_pmch_info                  = 1;
+  srsran::pmch_info_t* pmch_item        = &mcch_t.pmch_info_list[0];
+
+  pmch_item->nof_mbms_session_info              = 1;
+  pmch_item->mbms_session_info_list[0].lc_ch_id = 1;
+  if (pmch_item->nof_mbms_session_info > 1) {
+    pmch_item->mbms_session_info_list[1].lc_ch_id = 2;
+  }
+  uint16_t mbms_mcs = cfg.mbms_mcs;
+  if (mbms_mcs > 28) {
+    mbms_mcs = 28; // TS 36.213, Table 8.6.1-1
+    logger.warning("PMCH data MCS too high, setting it to 28");
+  }
+  logger.debug("PMCH data MCS=%d", mbms_mcs);
+  pmch_item->data_mcs         = mbms_mcs;
+  pmch_item->mch_sched_period = srsran::pmch_info_t::mch_sched_period_t::rf64;
+  pmch_item->sf_alloc_end     = 64 * 6;
+  phy->configure_mbsfn(&sibs2, &sibs13, mcch_t);
+  mac->write_mcch(&sibs2, &sibs13, &mcch_t, mcch_payload_buffer, current_mcch_length);
+}
+
+
+
+uint32_t rrc::generate_sibs(int sfalloc, int sfperiod)
+{
+  // nof_messages includes SIB2 by default, plus all configured SIBs
+  uint32_t           nof_messages = 1 + cfg.sib1.sched_info_list.size();
+  sched_info_list_l& sched_info   = cfg.sib1.sched_info_list;
+
+  // generate and pack into SIB buffers
+  for (uint32_t cc_idx = 0; cc_idx < cfg.cell_list.size(); cc_idx++) {
+    int      nmbsfn_period=sfperiod;
+    int      nmbsfn_sfalloc=sfalloc;
+
+    if (nmbsfn_period == 1) {
+      cell_common_list->get_cc_idx(cc_idx)->sib2.mbsfn_sf_cfg_list[0].radioframe_alloc_period.value =mbsfn_sf_cfg_s::radioframe_alloc_period_opts::n1;
+    }
+     else if (nmbsfn_period==2)
+  {
+    cell_common_list->get_cc_idx(cc_idx)->sib2.mbsfn_sf_cfg_list[0].radioframe_alloc_period.value =mbsfn_sf_cfg_s::radioframe_alloc_period_opts::n2;
+  }
+    else if (nmbsfn_period==4)
+  {
+    cell_common_list->get_cc_idx(cc_idx)->sib2.mbsfn_sf_cfg_list[0].radioframe_alloc_period .value =mbsfn_sf_cfg_s::radioframe_alloc_period_opts::n4;
+  }
+    else if (nmbsfn_period==8)
+  {
+    cell_common_list->get_cc_idx(cc_idx)->sib2.mbsfn_sf_cfg_list[0].radioframe_alloc_period .value =mbsfn_sf_cfg_s::radioframe_alloc_period_opts::n8;
+  }
+    else if (nmbsfn_period==16)
+  {
+    cell_common_list->get_cc_idx(cc_idx)->sib2.mbsfn_sf_cfg_list[0].radioframe_alloc_period .value =mbsfn_sf_cfg_s::radioframe_alloc_period_opts::n16;
+  }
+    else
+  {
+    cell_common_list->get_cc_idx(cc_idx)->sib2.mbsfn_sf_cfg_list[0].radioframe_alloc_period .value =mbsfn_sf_cfg_s::radioframe_alloc_period_opts::n32;
+  } 
+
+    cell_common_list->get_cc_idx(cc_idx)->sib2.mbsfn_sf_cfg_list[0].sf_alloc.set_one_frame().from_number(nmbsfn_sfalloc);
+    enb_cell_common* cell_ctxt = cell_common_list->get_cc_idx(cc_idx);
+    // msg is array of SI messages, each SI message msg[i] may contain multiple SIBs
+    // all SIBs in a SI message msg[i] share the same periodicity
+
+    asn1::dyn_array<bcch_dl_sch_msg_s> msg(nof_messages + 1);
+
+    // Copy SIB1 to first SI message
+    msg[0].msg.set_c1().set_sib_type1() = cell_ctxt->sib1;
+
+    // Copy rest of SIBs
+    for (uint32_t sched_info_elem = 0; sched_info_elem < nof_messages - 1; sched_info_elem++) {
+      uint32_t msg_index = sched_info_elem + 1; // first msg is SIB1, therefore start with second
+
+      msg[msg_index].msg.set_c1().set_sys_info().crit_exts.set_sys_info_r8();
+      sys_info_r8_ies_s::sib_type_and_info_l_& sib_list =
+          msg[msg_index].msg.c1().sys_info().crit_exts.sys_info_r8().sib_type_and_info;
+
+      // SIB2 always in second SI message
+      if (msg_index == 1) {
+        sib_info_item_c sibitem;
+
+        sibitem.set_sib2() = cell_ctxt->sib2;
+        sib_list.push_back(sibitem);
+      }
+
+      // Add other SIBs to this message, if any
+      for (auto& mapping_enum : sched_info[sched_info_elem].sib_map_info) {
+        sib_list.push_back(cfg.sibs[(int)mapping_enum + 2]);
+      }
+    }
+
+    cell_ctxt->sib_buffer.clear(); // reset the sib buffer. Without this the sib_buffer vector keeps expanding in size, cascading each newly generated sib
+    srsran::unique_byte_buffer_t sib_buffer;
+
+    // Pack payload for all messages
+    for (uint32_t msg_index = 0; msg_index < nof_messages; msg_index++) {
+      sib_buffer = srsran::make_byte_buffer();
+      if (sib_buffer == nullptr) {
+        logger.error("Couldn't allocate PDU in %s().", __FUNCTION__);
+        return SRSRAN_ERROR;
+      }
+      asn1::bit_ref bref(sib_buffer->msg, sib_buffer->get_tailroom());
+      if (msg[msg_index].pack(bref) == asn1::SRSASN_ERROR_ENCODE_FAIL) {
+        logger.error("Failed to pack SIB message %d", msg_index);
+        return SRSRAN_ERROR;
+      }
+      sib_buffer->N_bytes = bref.distance_bytes();
+
+      cell_ctxt->sib_buffer.push_back(std::move(sib_buffer));
+
+      std::string log_msg("CC" + std::to_string(cc_idx) + " SIB payload");
+      log_rrc_message(
+          log_msg, Tx, cell_ctxt->sib_buffer.back().get(), msg[msg_index], msg[msg_index].msg.c1().type().to_string());
     }
 
     if (cfg.sibs[6].type() == asn1::rrc::sys_info_r8_ies_s::sib_type_and_info_item_c_::types::sib7) {
@@ -920,20 +1104,9 @@ void rrc::configure_mbsfn_sibs(int sfalloc, int sfperiod)
     sibs2.mbsfn_sf_cfg_list[i].nof_alloc_subfrs = srsran::mbsfn_sf_cfg_t::sf_alloc_type_t::one_frame;
     sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_offset =
         cfg.sibs[1].sib2().mbsfn_sf_cfg_list[i].radioframe_alloc_offset;
-    // sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_period =
-    // (srsran::mbsfn_sf_cfg_t::alloc_period_t)cfg.sibs[1].sib2().mbsfn_sf_cfg_list[i].radioframe_alloc_period.value;
-    //string mbsfn_periodname;
-    //int      mbsfn_period;
     int      mbsfn_period=sfperiod;
-    //string      mbsfn_sfallocname;
-    //int      mbsfn_sfalloc;
     int      mbsfn_sfalloc=sfalloc;
-    //ifstream txmute("/home/merkebu/srsRAN/srsenb/mbsfn_set.txt");
-    
-    //txmute >>mbsfn_sfallocname;
-    //txmute>>mbsfn_sfalloc;
-    //txmute>> mbsfn_periodname;
-    //txmute>>mbsfn_period;
+
     
     if (mbsfn_period == 1) {
       sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_period = srsran::mbsfn_sf_cfg_t::alloc_period_t::n1;
@@ -949,11 +1122,8 @@ void rrc::configure_mbsfn_sibs(int sfalloc, int sfperiod)
       sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_period = srsran::mbsfn_sf_cfg_t::alloc_period_t::n32;
     }
 
-/*     int      nmbsfn_sfalloc;
-    ifstream txmute("/home/merkebu/srsRAN/srsenb/mbsfn_sfalloc.txt");
-    txmute >> nmbsfn_sfalloc; */
-    cfg.sibs[1].sib2().mbsfn_sf_cfg_list[0].sf_alloc.set_one_frame().from_number(mbsfn_sfalloc); // merkebu
-    sibs2.mbsfn_sf_cfg_list[i].sf_alloc = mbsfn_sfalloc;                                         //
+    cfg.sibs[1].sib2().mbsfn_sf_cfg_list[0].sf_alloc.set_one_frame().from_number(mbsfn_sfalloc); 
+    sibs2.mbsfn_sf_cfg_list[i].sf_alloc = mbsfn_sfalloc;                                         
   }
   // populate struct with sib13 values needed for PHY/MAC
   srsran::sib13_t sibs13;
