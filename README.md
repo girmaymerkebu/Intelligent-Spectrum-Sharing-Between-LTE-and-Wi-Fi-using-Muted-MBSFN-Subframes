@@ -10,6 +10,6 @@ Procedures to test the Adaptive SF allocation solution:
   * Clone the embms_fix branch from this repository using "git clone -b embms_fix git@gitlab.ilabt.imec.be:mgirmay/adaptive-sf-allocation-multicast_unicast.git"
   * Install in two PCs (eNB and UE)
   * Run srsenb and srsue with enb.conf and ue.conf configuration files respectively
-  * Generat iperf traffic and trace 
+  * Generate iperf traffic and trace 
   * Change the "subframe_allocation" and "Allocation_period"  values in "srsran/srsenb/mnsfn_set.txt" file and observe the iperf traffic changes accordingly
 
