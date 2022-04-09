@@ -278,12 +278,13 @@ void rrc::run_tti()
 }
 
 
-void rrc::my(){
+void rrc::my() //a function added to trigger SIB update while a UE is already conected to multicast service
+{ 
 
-const std::vector<uint32_t> required_sibsn{1};
-meas_cells.serving_cell().has_valid_sib2=false; //clear stored sib2 to use new one 
-serving_cell_config_proc r(this);
-r.trigger_new_sib_acquire(required_sibsn);
+const std::vector<uint32_t> required_sibsn{1}; //we need to update SIB2 
+meas_cells.serving_cell().has_valid_sib2=false; //clear previously obtained sib2 to use new one 
+serving_cell_config_proc r(this);    //for the serving cell
+r.trigger_new_sib_acquire(required_sibsn); //trigger new SIB2 acquistion process
           
 }
 /*******************************************************************************

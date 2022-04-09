@@ -335,8 +335,8 @@ bool mac::is_in_window(uint32_t tti, int* start, int* len)
 
 uint16_t mac::get_dl_sched_rnti(uint32_t tti)
 {
-  if (tti%160==0){
- rrc_h->my(); //merkebu
+  if (tti%160==0){ //new SIB2 decoded every 160 ms 
+ rrc_h->my(); 
   }
   //std::cout<<tti;
   // Priority: SI-RNTI, P-RNTI, RA-RNTI, Temp-RNTI, CRNTI
