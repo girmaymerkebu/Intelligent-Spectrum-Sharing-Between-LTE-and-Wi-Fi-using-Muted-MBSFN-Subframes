@@ -36,7 +36,7 @@ public:
   virtual void ra_completed()      = 0;
   virtual void ra_problem()        = 0;
   virtual void release_pucch_srs() = 0;
-  virtual void my() =  0; //merkebu
+  virtual void my() =  0; //Merkebu: Interface added between rrc and MAC for updated SIB2 generation based on the traffic demand  
 	
 };
 
