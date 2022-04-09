@@ -991,9 +991,164 @@ void rrc::configure_mbsfn_sibsn()
   mac->write_mcch(&sibs2, &sibs13, &mcch_t, mcch_payload_buffer, current_mcch_length);
 }
 
+int rrc::pack_mcch()
+{
+  mcch.msg.set_c1();
+  mbsfn_area_cfg_r9_s& area_cfg_r9      = mcch.msg.c1().mbsfn_area_cfg_r9();
+  area_cfg_r9.common_sf_alloc_period_r9 = mbsfn_area_cfg_r9_s::common_sf_alloc_period_r9_e_::rf64;
+  area_cfg_r9.common_sf_alloc_r9.resize(1);
+  mbsfn_sf_cfg_s* sf_alloc_item          = &area_cfg_r9.common_sf_alloc_r9[0];
+  sf_alloc_item->radioframe_alloc_offset = 0;
+  sf_alloc_item->radioframe_alloc_period = mbsfn_sf_cfg_s::radioframe_alloc_period_e_::n1;
+  sf_alloc_item->sf_alloc.set_one_frame().from_number(32 + 31);
+
+  area_cfg_r9.pmch_info_list_r9.resize(1);
+  pmch_info_r9_s* pmch_item = &area_cfg_r9.pmch_info_list_r9[0];
+  pmch_item->mbms_session_info_list_r9.resize(1);
+
+  pmch_item->mbms_session_info_list_r9[0].lc_ch_id_r9           = 1;
+  pmch_item->mbms_session_info_list_r9[0].session_id_r9_present = true;
+  pmch_item->mbms_session_info_list_r9[0].session_id_r9[0]      = 0;
+  pmch_item->mbms_session_info_list_r9[0].tmgi_r9.plmn_id_r9.set_explicit_value_r9();
+  srsran::plmn_id_t plmn_obj;
+  plmn_obj.from_string("00003");
+  srsran::to_asn1(&pmch_item->mbms_session_info_list_r9[0].tmgi_r9.plmn_id_r9.explicit_value_r9(), plmn_obj);
+  uint8_t byte[] = {0x0, 0x0, 0x0};
+  memcpy(&pmch_item->mbms_session_info_list_r9[0].tmgi_r9.service_id_r9[0], &byte[0], 3);
+
+  if (pmch_item->mbms_session_info_list_r9.size() > 1) {
+    pmch_item->mbms_session_info_list_r9[1].lc_ch_id_r9           = 2;
+    pmch_item->mbms_session_info_list_r9[1].session_id_r9_present = true;
+    pmch_item->mbms_session_info_list_r9[1].session_id_r9[0]      = 1;
+    pmch_item->mbms_session_info_list_r9[1].tmgi_r9.plmn_id_r9.set_explicit_value_r9() =
+        pmch_item->mbms_session_info_list_r9[0].tmgi_r9.plmn_id_r9.explicit_value_r9();
+    byte[2] = 1;
+    memcpy(&pmch_item->mbms_session_info_list_r9[1].tmgi_r9.service_id_r9[0],
+           &byte[0],
+           3); // TODO: Check if service is set to 1
+  }
+
+  uint16_t mbms_mcs = cfg.mbms_mcs;
+  if (mbms_mcs > 28) {
+    mbms_mcs = 28; // TS 36.213, Table 8.6.1-1
+    logger.warning("PMCH data MCS too high, setting it to 28");
+  }
+
+  logger.debug("PMCH data MCS=%d", mbms_mcs);
+  pmch_item->pmch_cfg_r9.data_mcs_r9         = mbms_mcs;
+  pmch_item->pmch_cfg_r9.mch_sched_period_r9 = pmch_cfg_r9_s::mch_sched_period_r9_e_::rf64;
+  pmch_item->pmch_cfg_r9.sf_alloc_end_r9     = 64 * 6;
+
+  const int     rlc_header_len = 1;
+  asn1::bit_ref bref(&mcch_payload_buffer[rlc_header_len], sizeof(mcch_payload_buffer) - rlc_header_len);
+  mcch.pack(bref);
+  current_mcch_length = bref.distance_bytes(&mcch_payload_buffer[1]);
+  current_mcch_length = current_mcch_length + rlc_header_len;
+  return current_mcch_length;
+}
 
 
-uint32_t rrc::generate_sibs(int sfalloc, int sfperiod)
+
+
+void rrc::configure_mbsfn_sibs(int sfalloc, int sfperiod)   //added to update new resource allocation configuration based on traffic changes
+{
+  // populate struct with sib2 values needed in PHY/MAC
+  srsran::sib2_mbms_t sibs2;
+  sibs2.mbsfn_sf_cfg_list_present = cfg.sibs[1].sib2().mbsfn_sf_cfg_list_present;
+  sibs2.nof_mbsfn_sf_cfg          = cfg.sibs[1].sib2().mbsfn_sf_cfg_list.size();
+  for (int i = 0; i < sibs2.nof_mbsfn_sf_cfg; i++) {
+    sibs2.mbsfn_sf_cfg_list[i].nof_alloc_subfrs = srsran::mbsfn_sf_cfg_t::sf_alloc_type_t::one_frame;
+    sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_offset =
+        cfg.sibs[1].sib2().mbsfn_sf_cfg_list[i].radioframe_alloc_offset;
+    int      mbsfn_period=sfperiod;
+    int      mbsfn_sfalloc=sfalloc;
+
+    
+    if (mbsfn_period == 1) {
+      sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_period = srsran::mbsfn_sf_cfg_t::alloc_period_t::n1;
+    } else if (mbsfn_period == 2) {
+      sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_period = srsran::mbsfn_sf_cfg_t::alloc_period_t::n2;
+    } else if (mbsfn_period == 4) {
+      sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_period = srsran::mbsfn_sf_cfg_t::alloc_period_t::n4;
+    } else if (mbsfn_period == 8) {
+      sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_period = srsran::mbsfn_sf_cfg_t::alloc_period_t::n8;
+    } else if (mbsfn_period == 16) {
+      sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_period = srsran::mbsfn_sf_cfg_t::alloc_period_t::n16;
+    } else {
+      sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_period = srsran::mbsfn_sf_cfg_t::alloc_period_t::n32;
+    }
+
+    cfg.sibs[1].sib2().mbsfn_sf_cfg_list[0].sf_alloc.set_one_frame().from_number(mbsfn_sfalloc); 
+    sibs2.mbsfn_sf_cfg_list[i].sf_alloc = mbsfn_sfalloc;                                         
+  }
+  // populate struct with sib13 values needed for PHY/MAC
+  srsran::sib13_t sibs13;
+  sibs13.notif_cfg.notif_offset = cfg.sibs[12].sib13_v920().notif_cfg_r9.notif_offset_r9;
+  sibs13.notif_cfg.notif_repeat_coeff =
+      (srsran::mbms_notif_cfg_t::coeff_t)cfg.sibs[12].sib13_v920().notif_cfg_r9.notif_repeat_coeff_r9.value;
+  sibs13.notif_cfg.notif_sf_idx = cfg.sibs[12].sib13_v920().notif_cfg_r9.notif_sf_idx_r9;
+  sibs13.nof_mbsfn_area_info    = cfg.sibs[12].sib13_v920().mbsfn_area_info_list_r9.size();
+  for (uint32_t i = 0; i < sibs13.nof_mbsfn_area_info; i++) {
+    sibs13.mbsfn_area_info_list[i].mbsfn_area_id =
+        cfg.sibs[12].sib13_v920().mbsfn_area_info_list_r9[i].mbsfn_area_id_r9;
+    sibs13.mbsfn_area_info_list[i].notif_ind        = cfg.sibs[12].sib13_v920().mbsfn_area_info_list_r9[i].notif_ind_r9;
+    sibs13.mbsfn_area_info_list[i].mcch_cfg.sig_mcs = (srsran::mbsfn_area_info_t::mcch_cfg_t::sig_mcs_t)cfg.sibs[12]
+                                                          .sib13_v920()
+                                                          .mbsfn_area_info_list_r9[i]
+                                                          .mcch_cfg_r9.sig_mcs_r9.value;
+    sibs13.mbsfn_area_info_list[i].mcch_cfg.sf_alloc_info =
+        cfg.sibs[12].sib13_v920().mbsfn_area_info_list_r9[i].mcch_cfg_r9.sf_alloc_info_r9.to_number();
+    sibs13.mbsfn_area_info_list[i].mcch_cfg.mcch_repeat_period =
+        (srsran::mbsfn_area_info_t::mcch_cfg_t::repeat_period_t)cfg.sibs[12]
+            .sib13_v920()
+            .mbsfn_area_info_list_r9[i]
+            .mcch_cfg_r9.mcch_repeat_period_r9.value;
+    sibs13.mbsfn_area_info_list[i].mcch_cfg.mcch_offset =
+        cfg.sibs[12].sib13_v920().mbsfn_area_info_list_r9[i].mcch_cfg_r9.mcch_offset_r9;
+    sibs13.mbsfn_area_info_list[i].mcch_cfg.mcch_mod_period =
+        (srsran::mbsfn_area_info_t::mcch_cfg_t::mod_period_t)cfg.sibs[12]
+            .sib13_v920()
+            .mbsfn_area_info_list_r9[i]
+            .mcch_cfg_r9.mcch_mod_period_r9.value;
+    sibs13.mbsfn_area_info_list[i].non_mbsfn_region_len = (srsran::mbsfn_area_info_t::region_len_t)cfg.sibs[12]
+                                                              .sib13_v920()
+                                                              .mbsfn_area_info_list_r9[i]
+                                                              .non_mbsfn_region_len.value;
+    sibs13.mbsfn_area_info_list[i].notif_ind = cfg.sibs[12].sib13_v920().mbsfn_area_info_list_r9[i].notif_ind_r9;
+  }
+
+  // pack MCCH for transmission and pass relevant MCCH values to PHY/MAC
+  pack_mcch();
+  srsran::mcch_msg_t mcch_t;
+  mcch_t.common_sf_alloc_period         = srsran::mcch_msg_t::common_sf_alloc_period_t::rf64;
+  mcch_t.nof_common_sf_alloc            = 1;
+  srsran::mbsfn_sf_cfg_t sf_alloc_item  = mcch_t.common_sf_alloc[0];
+  sf_alloc_item.radioframe_alloc_offset = 0;
+  sf_alloc_item.radioframe_alloc_period = srsran::mbsfn_sf_cfg_t::alloc_period_t::n1;
+  sf_alloc_item.sf_alloc                = 63;
+  mcch_t.nof_pmch_info                  = 1;
+  srsran::pmch_info_t* pmch_item        = &mcch_t.pmch_info_list[0];
+
+  pmch_item->nof_mbms_session_info              = 1;
+  pmch_item->mbms_session_info_list[0].lc_ch_id = 1;
+  if (pmch_item->nof_mbms_session_info > 1) {
+    pmch_item->mbms_session_info_list[1].lc_ch_id = 2;
+  }
+  uint16_t mbms_mcs = cfg.mbms_mcs;
+  if (mbms_mcs > 28) {
+    mbms_mcs = 28; // TS 36.213, Table 8.6.1-1
+    logger.warning("PMCH data MCS too high, setting it to 28");
+  }
+  logger.debug("PMCH data MCS=%d", mbms_mcs);
+  pmch_item->data_mcs         = mbms_mcs;
+  pmch_item->mch_sched_period = srsran::pmch_info_t::mch_sched_period_t::rf64;
+  pmch_item->sf_alloc_end     = 64 * 6;
+  phy->configure_mbsfn(&sibs2, &sibs13, mcch_t);
+  mac->write_mcch(&sibs2, &sibs13, &mcch_t, mcch_payload_buffer, current_mcch_length);
+}
+
+
+uint32_t rrc::generate_sibs(int sfalloc, int sfperiod)  //added to generate a new SIB based on updated resource configuration
 {
   // nof_messages includes SIB2 by default, plus all configured SIBs
   uint32_t           nof_messages = 1 + cfg.sib1.sched_info_list.size();
@@ -1094,158 +1249,7 @@ uint32_t rrc::generate_sibs(int sfalloc, int sfperiod)
   return SRSRAN_SUCCESS;
 }
 
-void rrc::configure_mbsfn_sibs(int sfalloc, int sfperiod)
-{
-  // populate struct with sib2 values needed in PHY/MAC
-  srsran::sib2_mbms_t sibs2;
-  sibs2.mbsfn_sf_cfg_list_present = cfg.sibs[1].sib2().mbsfn_sf_cfg_list_present;
-  sibs2.nof_mbsfn_sf_cfg          = cfg.sibs[1].sib2().mbsfn_sf_cfg_list.size();
-  for (int i = 0; i < sibs2.nof_mbsfn_sf_cfg; i++) {
-    sibs2.mbsfn_sf_cfg_list[i].nof_alloc_subfrs = srsran::mbsfn_sf_cfg_t::sf_alloc_type_t::one_frame;
-    sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_offset =
-        cfg.sibs[1].sib2().mbsfn_sf_cfg_list[i].radioframe_alloc_offset;
-    int      mbsfn_period=sfperiod;
-    int      mbsfn_sfalloc=sfalloc;
 
-    
-    if (mbsfn_period == 1) {
-      sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_period = srsran::mbsfn_sf_cfg_t::alloc_period_t::n1;
-    } else if (mbsfn_period == 2) {
-      sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_period = srsran::mbsfn_sf_cfg_t::alloc_period_t::n2;
-    } else if (mbsfn_period == 4) {
-      sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_period = srsran::mbsfn_sf_cfg_t::alloc_period_t::n4;
-    } else if (mbsfn_period == 8) {
-      sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_period = srsran::mbsfn_sf_cfg_t::alloc_period_t::n8;
-    } else if (mbsfn_period == 16) {
-      sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_period = srsran::mbsfn_sf_cfg_t::alloc_period_t::n16;
-    } else {
-      sibs2.mbsfn_sf_cfg_list[i].radioframe_alloc_period = srsran::mbsfn_sf_cfg_t::alloc_period_t::n32;
-    }
-
-    cfg.sibs[1].sib2().mbsfn_sf_cfg_list[0].sf_alloc.set_one_frame().from_number(mbsfn_sfalloc); 
-    sibs2.mbsfn_sf_cfg_list[i].sf_alloc = mbsfn_sfalloc;                                         
-  }
-  // populate struct with sib13 values needed for PHY/MAC
-  srsran::sib13_t sibs13;
-  sibs13.notif_cfg.notif_offset = cfg.sibs[12].sib13_v920().notif_cfg_r9.notif_offset_r9;
-  sibs13.notif_cfg.notif_repeat_coeff =
-      (srsran::mbms_notif_cfg_t::coeff_t)cfg.sibs[12].sib13_v920().notif_cfg_r9.notif_repeat_coeff_r9.value;
-  sibs13.notif_cfg.notif_sf_idx = cfg.sibs[12].sib13_v920().notif_cfg_r9.notif_sf_idx_r9;
-  sibs13.nof_mbsfn_area_info    = cfg.sibs[12].sib13_v920().mbsfn_area_info_list_r9.size();
-  for (uint32_t i = 0; i < sibs13.nof_mbsfn_area_info; i++) {
-    sibs13.mbsfn_area_info_list[i].mbsfn_area_id =
-        cfg.sibs[12].sib13_v920().mbsfn_area_info_list_r9[i].mbsfn_area_id_r9;
-    sibs13.mbsfn_area_info_list[i].notif_ind        = cfg.sibs[12].sib13_v920().mbsfn_area_info_list_r9[i].notif_ind_r9;
-    sibs13.mbsfn_area_info_list[i].mcch_cfg.sig_mcs = (srsran::mbsfn_area_info_t::mcch_cfg_t::sig_mcs_t)cfg.sibs[12]
-                                                          .sib13_v920()
-                                                          .mbsfn_area_info_list_r9[i]
-                                                          .mcch_cfg_r9.sig_mcs_r9.value;
-    sibs13.mbsfn_area_info_list[i].mcch_cfg.sf_alloc_info =
-        cfg.sibs[12].sib13_v920().mbsfn_area_info_list_r9[i].mcch_cfg_r9.sf_alloc_info_r9.to_number();
-    sibs13.mbsfn_area_info_list[i].mcch_cfg.mcch_repeat_period =
-        (srsran::mbsfn_area_info_t::mcch_cfg_t::repeat_period_t)cfg.sibs[12]
-            .sib13_v920()
-            .mbsfn_area_info_list_r9[i]
-            .mcch_cfg_r9.mcch_repeat_period_r9.value;
-    sibs13.mbsfn_area_info_list[i].mcch_cfg.mcch_offset =
-        cfg.sibs[12].sib13_v920().mbsfn_area_info_list_r9[i].mcch_cfg_r9.mcch_offset_r9;
-    sibs13.mbsfn_area_info_list[i].mcch_cfg.mcch_mod_period =
-        (srsran::mbsfn_area_info_t::mcch_cfg_t::mod_period_t)cfg.sibs[12]
-            .sib13_v920()
-            .mbsfn_area_info_list_r9[i]
-            .mcch_cfg_r9.mcch_mod_period_r9.value;
-    sibs13.mbsfn_area_info_list[i].non_mbsfn_region_len = (srsran::mbsfn_area_info_t::region_len_t)cfg.sibs[12]
-                                                              .sib13_v920()
-                                                              .mbsfn_area_info_list_r9[i]
-                                                              .non_mbsfn_region_len.value;
-    sibs13.mbsfn_area_info_list[i].notif_ind = cfg.sibs[12].sib13_v920().mbsfn_area_info_list_r9[i].notif_ind_r9;
-  }
-
-  // pack MCCH for transmission and pass relevant MCCH values to PHY/MAC
-  pack_mcch();
-  srsran::mcch_msg_t mcch_t;
-  mcch_t.common_sf_alloc_period         = srsran::mcch_msg_t::common_sf_alloc_period_t::rf64;
-  mcch_t.nof_common_sf_alloc            = 1;
-  srsran::mbsfn_sf_cfg_t sf_alloc_item  = mcch_t.common_sf_alloc[0];
-  sf_alloc_item.radioframe_alloc_offset = 0;
-  sf_alloc_item.radioframe_alloc_period = srsran::mbsfn_sf_cfg_t::alloc_period_t::n1;
-  sf_alloc_item.sf_alloc                = 63;
-  mcch_t.nof_pmch_info                  = 1;
-  srsran::pmch_info_t* pmch_item        = &mcch_t.pmch_info_list[0];
-
-  pmch_item->nof_mbms_session_info              = 1;
-  pmch_item->mbms_session_info_list[0].lc_ch_id = 1;
-  if (pmch_item->nof_mbms_session_info > 1) {
-    pmch_item->mbms_session_info_list[1].lc_ch_id = 2;
-  }
-  uint16_t mbms_mcs = cfg.mbms_mcs;
-  if (mbms_mcs > 28) {
-    mbms_mcs = 28; // TS 36.213, Table 8.6.1-1
-    logger.warning("PMCH data MCS too high, setting it to 28");
-  }
-  logger.debug("PMCH data MCS=%d", mbms_mcs);
-  pmch_item->data_mcs         = mbms_mcs;
-  pmch_item->mch_sched_period = srsran::pmch_info_t::mch_sched_period_t::rf64;
-  pmch_item->sf_alloc_end     = 64 * 6;
-  phy->configure_mbsfn(&sibs2, &sibs13, mcch_t);
-  mac->write_mcch(&sibs2, &sibs13, &mcch_t, mcch_payload_buffer, current_mcch_length);
-}
-
-int rrc::pack_mcch()
-{
-  mcch.msg.set_c1();
-  mbsfn_area_cfg_r9_s& area_cfg_r9      = mcch.msg.c1().mbsfn_area_cfg_r9();
-  area_cfg_r9.common_sf_alloc_period_r9 = mbsfn_area_cfg_r9_s::common_sf_alloc_period_r9_e_::rf64;
-  area_cfg_r9.common_sf_alloc_r9.resize(1);
-  mbsfn_sf_cfg_s* sf_alloc_item          = &area_cfg_r9.common_sf_alloc_r9[0];
-  sf_alloc_item->radioframe_alloc_offset = 0;
-  sf_alloc_item->radioframe_alloc_period = mbsfn_sf_cfg_s::radioframe_alloc_period_e_::n1;
-  sf_alloc_item->sf_alloc.set_one_frame().from_number(32 + 31);
-
-  area_cfg_r9.pmch_info_list_r9.resize(1);
-  pmch_info_r9_s* pmch_item = &area_cfg_r9.pmch_info_list_r9[0];
-  pmch_item->mbms_session_info_list_r9.resize(1);
-
-  pmch_item->mbms_session_info_list_r9[0].lc_ch_id_r9           = 1;
-  pmch_item->mbms_session_info_list_r9[0].session_id_r9_present = true;
-  pmch_item->mbms_session_info_list_r9[0].session_id_r9[0]      = 0;
-  pmch_item->mbms_session_info_list_r9[0].tmgi_r9.plmn_id_r9.set_explicit_value_r9();
-  srsran::plmn_id_t plmn_obj;
-  plmn_obj.from_string("00003");
-  srsran::to_asn1(&pmch_item->mbms_session_info_list_r9[0].tmgi_r9.plmn_id_r9.explicit_value_r9(), plmn_obj);
-  uint8_t byte[] = {0x0, 0x0, 0x0};
-  memcpy(&pmch_item->mbms_session_info_list_r9[0].tmgi_r9.service_id_r9[0], &byte[0], 3);
-
-  if (pmch_item->mbms_session_info_list_r9.size() > 1) {
-    pmch_item->mbms_session_info_list_r9[1].lc_ch_id_r9           = 2;
-    pmch_item->mbms_session_info_list_r9[1].session_id_r9_present = true;
-    pmch_item->mbms_session_info_list_r9[1].session_id_r9[0]      = 1;
-    pmch_item->mbms_session_info_list_r9[1].tmgi_r9.plmn_id_r9.set_explicit_value_r9() =
-        pmch_item->mbms_session_info_list_r9[0].tmgi_r9.plmn_id_r9.explicit_value_r9();
-    byte[2] = 1;
-    memcpy(&pmch_item->mbms_session_info_list_r9[1].tmgi_r9.service_id_r9[0],
-           &byte[0],
-           3); // TODO: Check if service is set to 1
-  }
-
-  uint16_t mbms_mcs = cfg.mbms_mcs;
-  if (mbms_mcs > 28) {
-    mbms_mcs = 28; // TS 36.213, Table 8.6.1-1
-    logger.warning("PMCH data MCS too high, setting it to 28");
-  }
-
-  logger.debug("PMCH data MCS=%d", mbms_mcs);
-  pmch_item->pmch_cfg_r9.data_mcs_r9         = mbms_mcs;
-  pmch_item->pmch_cfg_r9.mch_sched_period_r9 = pmch_cfg_r9_s::mch_sched_period_r9_e_::rf64;
-  pmch_item->pmch_cfg_r9.sf_alloc_end_r9     = 64 * 6;
-
-  const int     rlc_header_len = 1;
-  asn1::bit_ref bref(&mcch_payload_buffer[rlc_header_len], sizeof(mcch_payload_buffer) - rlc_header_len);
-  mcch.pack(bref);
-  current_mcch_length = bref.distance_bytes(&mcch_payload_buffer[1]);
-  current_mcch_length = current_mcch_length + rlc_header_len;
-  return current_mcch_length;
-}
 
 /*******************************************************************************
   RRC run tti method
