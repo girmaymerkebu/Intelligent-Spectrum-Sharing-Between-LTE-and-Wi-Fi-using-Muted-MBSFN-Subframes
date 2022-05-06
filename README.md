@@ -1,6 +1,6 @@
 # An Adaptive MBSFN Resource Allocation Algorithm Between Multicast and Unicast Traffic
 ======================================================
-# Procedures
+# Installation and Execution Procedures
 
 This repository includes modifications included for periodic SIB generation from the eNB side and 
 periodic SIB decoding from the UE side. The periodic SIB generation is used to adptiveley set MBSFN 
