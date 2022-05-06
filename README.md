@@ -1,5 +1,6 @@
 # An Adaptive MBSFN Resource Allocation Algorithm Between Multicast and Unicast Traffic
 ======================================================
+# Procedures
 
 This repository includes modifications included for periodic SIB generation from the eNB side and 
 periodic SIB decoding from the UE side. The periodic SIB generation is used to adptiveley set MBSFN 
@@ -14,6 +15,8 @@ Procedures to test the Adaptive SF allocation solution:
   * Create MBMS gateway 
   * Generate dynamic multicast and unicast traffic load using iperf.
   * Trace the obtained unicast and multicast throughput to observe how the resourse allocation works adaptiveley as the traffic load varies.
+# Support
+merkebutekaw.girmay@ugent.be , Ihtisham.Khalid@imec.be
 
 =======================================================
 
