@@ -159,7 +159,7 @@ void mac::start_pcap_net(srsran::mac_pcap_net* pcap_net_)
   }
 }
 
-  ofstream of("myfile.csv"); 
+  //ofstream of("myfile.csv"); 
 /********************************************************
  *
  * RLC interface
@@ -806,9 +806,9 @@ void mac::build_mch_sched(uint32_t tbs)
 
     static int      mbsfn_period=32;   
     static int      mbsfn_sfalloc=1; 
-
-    rrc_h->configure_mbsfn_sibs(mbsfn_sfalloc, mbsfn_period);  //new MBSFN resource confugration set
-    rrc_h->generate_sibs(mbsfn_sfalloc, mbsfn_period);   //new SIB generated based on the new MBSFN resource confugration
+//KHID demo
+      //rrc_h->configure_mbsfn_sibs(mbsfn_sfalloc, mbsfn_period);  //new MBSFN resource confugration set
+    //rrc_h->generate_sibs(mbsfn_sfalloc, mbsfn_period);   //new SIB generated based on the new MBSFN resource confugration
 
 
   int total_space_avail_bytes = sfs_per_sched_period * bytes_per_sf;
@@ -838,13 +838,13 @@ void mac::build_mch_sched(uint32_t tbs)
   
   int total_bytes_to_tx = 0;
 
-  printf("total_space_avail_bytes = %d\n",total_space_avail_bytes_new);   
+  //printf("total_space_avail_bytes = %d\n",total_space_avail_bytes_new);   
 
   // calculate total bytes to be scheduled
   for (uint32_t i = 0; i < mch.num_mtch_sched; i++) {
     total_bytes_to_tx += mch.mtch_sched[i].lcid_buffer_size;
     mch.mtch_sched[i].stop = 0;
-    printf("total_bytes_to_tx = %d\n\n",total_bytes_to_tx); 
+    //printf("total_bytes_to_tx = %d\n\n",total_bytes_to_tx); 
   }
 
   float res = (float)(total_bytes_to_tx/total_space_avail_bytes_new)*100; 
@@ -852,17 +852,19 @@ void mac::build_mch_sched(uint32_t tbs)
   {
   	res = 100; 
   }
-  of << total_space_avail_bytes_new << ", " << total_bytes_to_tx << ", " << res << endl;
+  //of << total_space_avail_bytes_new << ", " << total_bytes_to_tx << ", " << res << endl;
 static int total_bytes_to_tx_old = 0;
 float y = abs((float)(total_bytes_to_tx_old-total_bytes_to_tx)/(total_bytes_to_tx+1));
-printf("here is absolute value %f\n", y);
+//printf("here is absolute value %f\n", y);
 if ( abs((float)(total_bytes_to_tx_old-total_bytes_to_tx)/(total_bytes_to_tx+1)) > 0.1  ) 
 {
-printf("------------------traffic changed - Compute new Configuration ----------------- \n");
+printf("Traffic changed - Compute new Configuration  \n");
 
 ///////////////////////////////////////////////////////////////////////////  Binary search algo start
-
+//for 10 MHZ
 static int queue_ranges[23]= {0,4950,9900,14850,19800,24750,29700,39600,49500,59400,79200,99000,118800,158400,198000,237600,316800,396000,475200,633600,792000,950400, 1540000};
+//for 20 MHZ
+//static int queue_ranges[23]= {0,2*4950,2*9900,2*14850,2*19800,2*24750,2*29700,2*39600,2*49500,2*59400,2*79200,2*99000,2*118800,2*158400,2*198000,2*237600,2*316800,2*396000,2*475200,2*633600,2*792000,2*950400, 2*1540000};
 // a range of all possible total_space_avail_bytes values for MCS=20 based on 3GPP 136.300 table 7.1.2.1-
 
 static int sf_periods[22]= {32,32,32,32,32,32,16,16,16,8,8,8,4,4,4,2,2,2,1,1,1,1}; 
@@ -874,16 +876,26 @@ int output = binarySearch(queue_ranges, 0, 22, 0.99*total_bytes_to_tx);  //selec
 mbsfn_period=sf_periods[output-1];
 
 mbsfn_sfalloc=sf_allocs[output-1];
+int yy =100*64*mbsfn_sfalloc_new/(640*mbsfn_period);
 printf("New Selected SF_ALLOC = %d\n",mbsfn_sfalloc);
 printf("New Selected SF_PERIOD = %d\n",mbsfn_period);
+printf("\n \n******************************************************");
+printf("\n RESOURCE PERCENTAGE ASSIGNED TO MULTICAST TRAFFIC-------------  = %d",yy);
+printf("%% ");
+printf("\n******************************************************\n \n");
 }
 ///////////////////////////////////////////////////////////////////////////  Binary search algo end - decisions made on sf_alloc and period
 
 else
 {
+int yy =100*64*mbsfn_sfalloc_new/(640*mbsfn_period);
 printf("traffic is SAME \n");
 printf("Hold previous SF_ALLOC = %d\n",mbsfn_sfalloc);
 printf("Hold previous SF_PERIOD = %d\n",mbsfn_period);
+printf("\n \n******************************************************");
+printf("\n RESOURCE PERCENTAGE ASSIGNED TO MULTICAST TRAFFIC-------------  = %d",yy);
+printf("%% ");
+printf("\n******************************************************\n \n");
 }
 total_bytes_to_tx_old = total_bytes_to_tx; 
 
@@ -917,7 +929,7 @@ int mac::get_mch_sched(uint32_t tti, bool is_mcch, dl_sched_list_t& dl_sched_res
   srsran_dl_fill_ra_mcs(&mcs_data, 0, cell_config[0].cell.nof_prb, false);
   if (is_mcch) {
     build_mch_sched(mcs_data.tbs);
-    printf("current tti = %d\n",tti);
+    //printf("current tti = %d\n",tti);
     mch.mcch_payload              = mcch_payload_buffer;
     mch.current_sf_allocation_num = 1;
     logger.info("MCH Sched Info: LCID: %d, Stop: %d, tti is %d ",
