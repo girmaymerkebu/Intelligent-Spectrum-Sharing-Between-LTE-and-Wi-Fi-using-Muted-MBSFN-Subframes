@@ -807,8 +807,8 @@ void mac::build_mch_sched(uint32_t tbs)
     static int      mbsfn_period=32;   
     static int      mbsfn_sfalloc=1; 
 //KHID demo
-      //rrc_h->configure_mbsfn_sibs(mbsfn_sfalloc, mbsfn_period);  //new MBSFN resource confugration set
-    //rrc_h->generate_sibs(mbsfn_sfalloc, mbsfn_period);   //new SIB generated based on the new MBSFN resource confugration
+    rrc_h->configure_mbsfn_sibs(mbsfn_sfalloc, mbsfn_period);  //new MBSFN resource confugration set
+    rrc_h->generate_sibs(mbsfn_sfalloc, mbsfn_period);   //new SIB generated based on the new MBSFN resource confugration
 
 
   int total_space_avail_bytes = sfs_per_sched_period * bytes_per_sf;
