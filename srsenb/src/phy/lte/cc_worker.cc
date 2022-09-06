@@ -540,7 +540,9 @@ int cc_worker::encode_pmch(stack_interface_phy_lte::dl_sched_grant_t* grant, srs
   // Set soft buffer
   pmch_cfg.pdsch_cfg.softbuffers.tx[0] = &temp_mbsfn_softbuffer;
 
+//don't include PMCH 
   // Encode PMCH
+
   if (srsran_enb_dl_put_pmch(&enb_dl, &pmch_cfg, grant->data[0])) {
     Error("Error putting PMCH");
     return SRSRAN_ERROR;

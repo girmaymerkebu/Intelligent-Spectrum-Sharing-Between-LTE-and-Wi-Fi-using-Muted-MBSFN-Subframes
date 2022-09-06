@@ -78,6 +78,7 @@ public:
     scheduler.set_dl_tti_mask(tti_mask, nof_sfs);
   }
   void build_mch_sched(uint32_t tbs);
+  int txtot_queue(uint32_t tx_queue, uint32_t retx_queue);
   
   int binarySearch(int arr[], int left, int right, int x);
 

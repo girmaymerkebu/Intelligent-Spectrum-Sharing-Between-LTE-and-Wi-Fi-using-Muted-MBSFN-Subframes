@@ -159,6 +159,16 @@ void mac::start_pcap_net(srsran::mac_pcap_net* pcap_net_)
   }
 }
 
+
+
+
+//int mac::txtot_queue(uint32_t tx_queue, uint32_t retx_queue){
+//int tx_total;
+//tx_total=tx_queue + retx_queue;
+//return tx_total;
+//}
+int tx_total;
+
   //ofstream of("myfile.csv"); 
 /********************************************************
  *
@@ -179,6 +189,12 @@ tti_counter_new = tti_counter_new+1;
   if (ue_db.contains(rnti)) {
     if (rnti != SRSRAN_MRNTI) {
       ret = scheduler.dl_rlc_buffer_state(rnti, lc_id, tx_queue, retx_queue);
+      //merkebu
+      tx_total=tx_queue + retx_queue;
+      //printf("Queue = %d\n\n",tx_queue);
+      //printf("Retx_Queue = %d\n\n",retx_queue);
+      //printf("TTI = %d\n\n",tti_counter_new);
+      //txtot_queue(tx_queue, retx_queue);
     } else {
       for (uint32_t i = 0; i < mch.num_mtch_sched; i++) {
       
@@ -638,7 +654,7 @@ int mac::get_dl_sched(uint32_t tti_tx_dl, dl_sched_list_t& dl_sched_res_list)
       // Copy data grants
       for (uint32_t i = 0; i < sched_result.data.size(); i++) {
         uint32_t tb_count = 0;
-        
+      
         // Get UE
         uint16_t rnti = sched_result.data[i].dci.rnti;
 
@@ -804,7 +820,9 @@ void mac::build_mch_sched(uint32_t tbs)
   int sfs_per_sched_period = mcch.pmch_info_list[0].sf_alloc_end;
   int bytes_per_sf         = tbs / 8 - 6; // leave 6 bytes for header
 
-    static int      mbsfn_period=32;   
+    //static int      mbsfn_period=32;   
+    //static int      mbsfn_sfalloc=1; 
+    static int      mbsfn_period=1;   
     static int      mbsfn_sfalloc=1; 
 //KHID demo
     rrc_h->configure_mbsfn_sibs(mbsfn_sfalloc, mbsfn_period);  //new MBSFN resource confugration set
@@ -835,7 +853,10 @@ void mac::build_mch_sched(uint32_t tbs)
   int total_space_avail_bytes_new = bytes_per_sf * mbsfn_sfalloc_new *64/mbsfn_period;  //calculates available resource in bytes
   
   int total_space_avail_bytes_unicast = bytes_per_sf * (10-mbsfn_sfalloc_new) *64;
-  
+
+ //dl_sched_res->pdsch[0].data[0]
+
+
   int total_bytes_to_tx = 0;
 
   //printf("total_space_avail_bytes = %d\n",total_space_avail_bytes_new);   
@@ -846,7 +867,10 @@ void mac::build_mch_sched(uint32_t tbs)
     mch.mtch_sched[i].stop = 0;
     //printf("total_bytes_to_tx = %d\n\n",total_bytes_to_tx); 
   }
-
+  //merkebu
+  //printf("total_bytes_to_tx = %d\n\n",total_bytes_to_tx);
+  //total_bytes_to_tx=tx_total;
+  //printf("tx_total = %d\n\n",total_bytes_to_tx);
   float res = (float)(total_bytes_to_tx/total_space_avail_bytes_new)*100; 
   if (res > 100)
   {
@@ -877,26 +901,26 @@ mbsfn_period=sf_periods[output-1];
 
 mbsfn_sfalloc=sf_allocs[output-1];
 int yy =100*64*mbsfn_sfalloc_new/(640*mbsfn_period);
-printf("New Selected SF_ALLOC = %d\n",mbsfn_sfalloc);
+/*printf("New Selected SF_ALLOC = %d\n",mbsfn_sfalloc);
 printf("New Selected SF_PERIOD = %d\n",mbsfn_period);
 printf("\n \n******************************************************");
 printf("\n RESOURCE PERCENTAGE ASSIGNED TO MULTICAST TRAFFIC-------------  = %d",yy);
 printf("%% ");
 printf("\n******************************************************\n \n");
-}
+*/}
 ///////////////////////////////////////////////////////////////////////////  Binary search algo end - decisions made on sf_alloc and period
 
 else
 {
 int yy =100*64*mbsfn_sfalloc_new/(640*mbsfn_period);
-printf("traffic is SAME \n");
+/*printf("traffic is SAME \n");
 printf("Hold previous SF_ALLOC = %d\n",mbsfn_sfalloc);
 printf("Hold previous SF_PERIOD = %d\n",mbsfn_period);
 printf("\n \n******************************************************");
 printf("\n RESOURCE PERCENTAGE ASSIGNED TO MULTICAST TRAFFIC-------------  = %d",yy);
 printf("%% ");
 printf("\n******************************************************\n \n");
-}
+*/}
 total_bytes_to_tx_old = total_bytes_to_tx; 
 
   int last_mtch_stop = 0;
