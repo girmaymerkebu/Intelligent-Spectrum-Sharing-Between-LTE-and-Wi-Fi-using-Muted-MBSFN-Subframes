@@ -1,4 +1,4 @@
-# An Adaptive MBSFN Resource Allocation Algorithm Between Multicast and Unicast Traffic
+# Adaptive Empty MBSFN Subframe Allocation 
 ======================================================
 # Installation and Execution Procedures
 
