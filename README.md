@@ -9,7 +9,7 @@ subframe allocation and periodicity values.
 
 Procedures to test the solution:
   * Clone this repository using "git clone https://gitlab.ilabt.imec.be/mgirmay/adaptive-mbsfn.git".
-  * checkout to 'DSS' branch and install in atleast two host PCs .
+  * Checkout to 'DSS' branch and install in atleast two host PCs .
   * Run the srsepc, srsmbms, and srsenb (with the enb.conf) in the eNB host PC.  
   * Run srsue (with the configuration file ue.conf) in the UE host PC .
   * Create MBMS gateway 
