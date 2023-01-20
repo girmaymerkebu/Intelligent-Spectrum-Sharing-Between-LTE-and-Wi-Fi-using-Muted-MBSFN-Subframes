@@ -11,7 +11,7 @@ Procedures to test the solution:
   * Setup end-to-end Wi-Fi network on the same band as LTE
   * Generate dynamic LTE unicast traffic and Wi-Fi traffic loads using iperf.
   * Trace the obtained LTE and Wi-Fi throughput to observe how the resourse allocation works adaptiveley as the LTE and WiFi traffic loads vary.
-  ![Experiment Setup](C:\Users\Administrator\Downloads\drawio\exp_setip.png)
+
 ## Support
 merkebutekaw.girmay@ugent.be 
 
