@@ -7,8 +7,8 @@ Procedures to test the solution:
   * Checkout to 'DSS' branch and install in atleast two host PCs .
   * Run the srsepc, srsmbms, and srsenb (with the enb.conf) in the eNB host PC.  
   * Run srsue (with the configuration file ue.conf) in the UE host PC .
-  * Create MBMS gateway 
-  * Setup end-to-end Wi-Fi network on the same band as LTE
+  * Create MBMS gateway. 
+  * Setup end-to-end Wi-Fi network on the same band as LTE.
   * Generate dynamic LTE unicast traffic and Wi-Fi traffic loads using iperf.
   * Trace the obtained LTE and Wi-Fi throughput to observe how the resourse allocation works adaptiveley as the LTE and WiFi traffic loads vary.
 
