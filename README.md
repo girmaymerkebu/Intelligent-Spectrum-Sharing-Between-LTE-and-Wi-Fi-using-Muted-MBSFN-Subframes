@@ -19,11 +19,9 @@ merkebutekaw.girmay@ugent.be
 
 # Reference
 
-If you utilize the provided source code, please kindly cite the following research paper:
+If you utilize the provided source code, please kindly acknowledge and cite the following research paper:
 
-M. Girmay, et al., "[Enabling Uncoordinated Dynamic Spectrum Sharing Between LTE and NR Networks](https://ieeexplore.ieee.org/document/10313113)," IEEE Transactions on Wireless Communications, 2023.
-
-
+M. Girmay, P. Avila-Campos, V. Maglogiannis, D. Naudts, A. Shahid and I. Moerman, "[Intelligent Spectrum Sharing Between LTE and Wi-Fi Networks using Muted MBSFN Subframes](https://ieeexplore.ieee.org/document/10124903)," 2023 IEEE Wireless and Microwave Technology Conference (WAMICON), Melbourne, FL, USA, 2023, pp. 13-16, doi: 10.1109/WAMICON57636.2023.10124903.
 
 
 
